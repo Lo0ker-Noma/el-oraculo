@@ -3,47 +3,79 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>El Oráculo — apuestas resueltas por IA, pagadas por Lightning</title>
+<title>El Oráculo — apuesta en sats, descubre la verdad</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
 
-<header>
-  <div class="topbar">
-    <div class="brand"><span class="eye">🔮</span> EL ORÁCULO</div>
-    <button id="nostrBtn" class="glass-btn nostr">⚡ Conéctate con Nostr</button>
+<nav class="navbar glass">
+  <a class="brand" href="#crear">
+    <img id="navLogo" class="nav-ball" src="logo.png" alt="">
+    <span class="eye">🔮</span>
+    <span class="wordmark">EL ORÁCULO</span>
+  </a>
+  <div class="navlinks">
+    <a href="#crear" class="active">✦ Nueva apuesta</a>
+    <a href="#apuestas">☰ Mis apuestas</a>
+    <a href="#como">? Cómo funciona</a>
+    <a href="#apuestas">▮ Estadísticas</a>
   </div>
-  <p class="tag">Apuesta en sats. Un agente IA investiga la verdad, dicta veredicto con fuentes y reparte el bote por Lightning. <b>Sin casa de apuestas. Sin árbitro humano. Sin confianza.</b></p>
-  <div id="modeBadge" class="badge"></div>
+  <button id="nostrBtn" class="glass-btn nostr">⚡ Conéctate con Nostr</button>
+</nav>
+
+<header class="hero">
+  <img id="heroLogo" class="hero-ball" src="logo.png" alt="El Oráculo">
+  <div class="hero-text">
+    <h1>Apuesta en sats. <span class="grad">Descubre la verdad.</span></h1>
+    <p class="tag">Un agente IA investiga la verdad, dicta veredicto con fuentes y reparte el bote por Lightning. <b>Sin casa de apuestas. Sin árbitro humano. Sin confianza.</b></p>
+    <div id="modeBadge" class="badge"></div>
+  </div>
 </header>
 
-<section class="card glass">
-  <h2>➕ Nueva apuesta</h2>
-  <input id="q" type="text" maxlength="280" placeholder='Ej: "¿BTC cierra hoy por encima de 100.000 USD?"'>
-  <input id="desc" type="text" maxlength="500" placeholder="Contexto opcional (criterio de resolución, fuente preferida...)">
-  <div class="row">
-    <label>Apuestas abiertas <input id="minOpen" type="number" value="60" min="1" max="1440"> min</label>
-    <label>Se resuelve en <input id="minResolve" type="number" value="65" min="1" max="1440"> min</label>
-    <button id="btnCreate" class="glass-btn accent">Crear apuesta</button>
-  </div>
-  <p id="createMsg" class="error"></p>
-</section>
+<main>
+  <section id="crear" class="card glass create">
+    <h2><span class="spark">✦</span> Nueva apuesta</h2>
+    <div class="field">
+      <label>Pregunta / Apuesta</label>
+      <textarea id="q" maxlength="160" rows="2" placeholder='Ej: "¿BTC cierra hoy por encima de 100.000 USD?"'></textarea>
+      <span class="counter" id="qCount">0/160</span>
+    </div>
+    <div class="field">
+      <textarea id="desc" maxlength="280" rows="2" placeholder="Contexto opcional (criterio de resolución, fuente preferida...)"></textarea>
+      <span class="counter" id="descCount">0/280</span>
+    </div>
+    <div class="create-row">
+      <label class="stepper"><span class="ico">⏱</span> Apuestas abiertas <input id="minOpen" type="number" value="5" min="1" max="1440"> min</label>
+      <label class="stepper"><span class="ico">⏳</span> Se resuelve en <input id="minResolve" type="number" value="6" min="1" max="1440"> min</label>
+      <button id="btnCreate" class="glass-btn primary">✦ Crear apuesta</button>
+    </div>
+    <p id="createMsg" class="error"></p>
+  </section>
 
-<div id="markets"></div>
+  <section id="como" class="features">
+    <div class="feature card glass"><div class="ftile">🛡️</div><div class="ftext"><b>Sin intermediarios</b><span>Sin casa de apuestas. Sin árbitro humano.</span></div></div>
+    <div class="feature card glass"><div class="ftile">⚡</div><div class="ftext"><b>Pagos por Lightning</b><span>Botes y recompensas en satoshis.</span></div></div>
+    <div class="feature card glass"><div class="ftile">📖</div><div class="ftext"><b>Transparencia</b><span>Veredictos con fuentes verificables por IA.</span></div></div>
+  </section>
 
-<!-- Modal de pago -->
+  <section id="apuestas">
+    <div id="markets"></div>
+  </section>
+</main>
+
+<div class="divider">✦</div>
+<footer>El Oráculo — Verdad descentralizada.</footer>
+
 <div id="payModal" class="modal hidden">
   <div class="card glass modalCard">
     <h2 id="payTitle">Paga tu apuesta ⚡</h2>
-    <img id="payQr" alt="QR de la invoice Lightning">
+    <img id="payQr" alt="QR de la invoice">
     <p class="invoice" id="payInvoice"></p>
     <p id="payStatus" class="muted">Esperando pago…</p>
-    <button id="payClose" class="glass-btn">Cerrar</button>
+    <button id="payClose" class="glass-btn sec">Cerrar</button>
   </div>
 </div>
 
-<footer class="muted">El Oráculo · 🤖 AI Agents — Lightning Hackathons 2026 (La Crypta) · MIT</footer>
 <script src="app.js"></script>
 </body>
 </html>

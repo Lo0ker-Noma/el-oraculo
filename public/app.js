@@ -187,6 +187,20 @@ async function resolveNow(id) {
 $("btnCreate").addEventListener("click", createMarket);
 $("payClose").addEventListener("click", closePay);
 $("nostrBtn").addEventListener("click", () => { if (auth) { auth = null; renderAuth(); } else nostrLogin(); });
+
+// contadores de caracteres
+[["q", "qCount", 160], ["desc", "descCount", 280]].forEach(([i, c, max]) => {
+  const inp = $(i), cnt = $(c);
+  if (!inp || !cnt) return;
+  const upd = () => (cnt.textContent = `${inp.value.length}/${max}`);
+  inp.addEventListener("input", upd); upd();
+});
+// fallback si falta el logo
+const _nl = $("navLogo");
+if (_nl) _nl.addEventListener("error", () => { _nl.classList.add("hidden"); const eye = document.querySelector(".brand .eye"); if (eye) eye.style.display = "inline"; });
+const _hl = $("heroLogo");
+if (_hl) _hl.addEventListener("error", () => _hl.classList.add("hidden"));
+
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action]");
   if (!el) return;
