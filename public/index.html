@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Oráculo — apuestas resueltas por IA, pagadas por Lightning</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="eye">🔮</div>
+  <h1>EL ORÁCULO</h1>
+  <p class="tag">Apuesta en sats. Un agente IA investiga la verdad, dicta veredicto con fuentes y reparte el bote por Lightning. <b>Sin casa de apuestas. Sin árbitro humano. Sin confianza.</b></p>
+  <div id="modeBadge" class="badge"></div>
+</header>
+
+<section class="card">
+  <h2>➕ Nueva apuesta</h2>
+  <input id="q" type="text" placeholder='Ej: "¿BTC cierra hoy por encima de 100.000 USD?"'>
+  <input id="desc" type="text" placeholder="Contexto opcional (criterio de resolución, fuente preferida...)">
+  <div class="row">
+    <label>Apuestas abiertas <input id="minOpen" type="number" value="5" min="1" style="width:64px"> min</label>
+    <label>Se resuelve en <input id="minResolve" type="number" value="6" min="1" style="width:64px"> min</label>
+    <button id="btnCreate">Crear apuesta</button>
+  </div>
+  <p id="createMsg" class="error"></p>
+</section>
+
+<div id="markets"></div>
+
+<!-- Modal de pago -->
+<div id="payModal" class="modal hidden">
+  <div class="card modalCard">
+    <h2 id="payTitle">Paga tu apuesta ⚡</h2>
+    <img id="payQr" alt="QR de la invoice">
+    <p class="invoice" id="payInvoice"></p>
+    <p id="payStatus" class="muted">Esperando pago…</p>
+    <button class="sec" onclick="closePay()">Cerrar</button>
+  </div>
+</div>
+
+<footer class="muted">El Oráculo · 🤖 AI Agents — Lightning Hackathons 2026 (La Crypta) · MIT</footer>
+<script src="app.js"></script>
+</body>
+</html>

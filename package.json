@@ -1,0 +1,19 @@
+{
+  "name": "el-oraculo",
+  "version": "0.1.0",
+  "description": "Apuestas sociales con bote Lightning resueltas por un agente IA que investiga, decide y paga solo",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
+    "@getalby/lightning-tools": "^8.2.0",
+    "@getalby/sdk": "^8.0.3",
+    "express": "^5.2.1",
+    "nostr-tools": "^2.23.12",
+    "qrcode": "^1.5.4"
+  }
+}
