@@ -45,6 +45,7 @@ Crea un `.env` (ver `.env.example`):
 | `XAI_API_KEY` | **(recomendado)** El agente investiga con **Live Search de Grok (xAI)** y cita las fuentes. |
 | `ANTHROPIC_API_KEY` | Alternativa: **Claude Opus 4.8** + web search server tool + salida con schema. |
 | `ORACLE_NSEC` | Identidad Nostr del oráculo: publica cada veredicto como nota pública (kind 1). |
+| `SESSION_SECRET` | Firma los tokens del **login opcional con Nostr** (NIP-07). Si falta, se genera aleatorio al arrancar. |
 
 Cada pieza degrada con elegancia: puedes activar solo la que quieras.
 
@@ -77,6 +78,16 @@ frontend: vanilla HTML/CSS/JS · QR de pago · estado en vivo
 - **Sin DB**: estado en `data/markets.json`, inspeccionable a mano.
 - El botón **"🔮 resolver ya"** dispara la resolución al instante (perfecto
   para demos en vivo).
+
+## Identidad (opcional) y seguridad
+
+- **Login con Nostr (NIP-07):** puedes apostar anónimamente, o conectarte con tu
+  extensión (Alby, nos2x…) para que tus apuestas queden atribuidas a tu `npub`.
+  No se confía en un pubkey a secas: el cliente firma un evento **NIP-98** que el
+  servidor verifica antes de emitir un token de sesión.
+- **Endurecido y pentesteado:** CSP estricta, rate limiting, validación de
+  entrada, anti-SSRF en las Lightning addresses y anti-XSS en las fuentes del
+  veredicto. Detalle completo en **[PENTEST.md](./PENTEST.md)**.
 
 ## Limitaciones honestas (MVP de hackathon)
 

@@ -7,22 +7,25 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="bg-orbs" aria-hidden="true"><span></span><span></span><span></span></div>
 
 <header>
-  <div class="eye">🔮</div>
-  <h1>EL ORÁCULO</h1>
+  <div class="topbar">
+    <div class="brand"><span class="eye">🔮</span> EL ORÁCULO</div>
+    <button id="nostrBtn" class="glass-btn nostr">⚡ Conéctate con Nostr</button>
+  </div>
   <p class="tag">Apuesta en sats. Un agente IA investiga la verdad, dicta veredicto con fuentes y reparte el bote por Lightning. <b>Sin casa de apuestas. Sin árbitro humano. Sin confianza.</b></p>
   <div id="modeBadge" class="badge"></div>
 </header>
 
-<section class="card">
+<section class="card glass">
   <h2>➕ Nueva apuesta</h2>
-  <input id="q" type="text" placeholder='Ej: "¿BTC cierra hoy por encima de 100.000 USD?"'>
-  <input id="desc" type="text" placeholder="Contexto opcional (criterio de resolución, fuente preferida...)">
+  <input id="q" type="text" maxlength="280" placeholder='Ej: "¿BTC cierra hoy por encima de 100.000 USD?"'>
+  <input id="desc" type="text" maxlength="500" placeholder="Contexto opcional (criterio de resolución, fuente preferida...)">
   <div class="row">
-    <label>Apuestas abiertas <input id="minOpen" type="number" value="5" min="1" style="width:64px"> min</label>
-    <label>Se resuelve en <input id="minResolve" type="number" value="6" min="1" style="width:64px"> min</label>
-    <button id="btnCreate">Crear apuesta</button>
+    <label>Apuestas abiertas <input id="minOpen" type="number" value="60" min="1" max="1440"> min</label>
+    <label>Se resuelve en <input id="minResolve" type="number" value="65" min="1" max="1440"> min</label>
+    <button id="btnCreate" class="glass-btn accent">Crear apuesta</button>
   </div>
   <p id="createMsg" class="error"></p>
 </section>
@@ -31,12 +34,12 @@
 
 <!-- Modal de pago -->
 <div id="payModal" class="modal hidden">
-  <div class="card modalCard">
+  <div class="card glass modalCard">
     <h2 id="payTitle">Paga tu apuesta ⚡</h2>
-    <img id="payQr" alt="QR de la invoice">
+    <img id="payQr" alt="QR de la invoice Lightning">
     <p class="invoice" id="payInvoice"></p>
     <p id="payStatus" class="muted">Esperando pago…</p>
-    <button class="sec" onclick="closePay()">Cerrar</button>
+    <button id="payClose" class="glass-btn">Cerrar</button>
   </div>
 </div>
 

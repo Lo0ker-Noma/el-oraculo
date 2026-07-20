@@ -9,18 +9,50 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
+import { nip19 } from "nostr-tools";
 import * as store from "./lib/store.js";
 import * as wallet from "./lib/wallet.js";
 import { resolveWithAI, demoVerdict } from "./lib/oracle.js";
 import { publishVerdict } from "./lib/nostr.js";
+import { verifyNip98, issueToken, verifyToken } from "./lib/auth.js";
+import { securityHeaders, rateLimit, safeLnAddress, sanitizeUrls, clean } from "./lib/security.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5220;
+
 const app = express();
-app.use(express.json());
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+app.use(securityHeaders);
+app.use(express.json({ limit: "32kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
-const publicMarket = (m) => ({ ...m, pools: store.pools(m), bets: m.bets.filter((b) => b.paid).map(({ id, side, sats, payout_sats, payout_status }) => ({ id, side, sats, payout_sats, payout_status })) });
+const npubOf = (pk) => { try { return pk ? nip19.npubEncode(pk) : null; } catch { return null; } };
+
+const publicMarket = (m) => ({
+  id: m.id,
+  question: m.question,
+  description: m.description,
+  created_at: m.created_at,
+  closes_at: m.closes_at,
+  resolves_at: m.resolves_at,
+  status: m.status,
+  verdict: m.verdict,
+  nostr: m.nostr,
+  pools: store.pools(m),
+  bets: m.bets.filter((b) => b.paid).map((b) => ({
+    id: b.id, side: b.side, sats: b.sats,
+    npub: npubOf(b.pubkey), payout_sats: b.payout_sats, payout_status: b.payout_status,
+  })),
+});
+
+// --- Login opcional con Nostr (NIP-07 cliente + NIP-98 aqui) ---------------
+
+app.post("/api/nostr/login", rateLimit(15, 10 * 60_000), (req, res) => {
+  const pubkey = verifyNip98(req.body?.event);
+  if (!pubkey) return res.status(401).json({ ok: false, error: "Firma Nostr invalida o caducada." });
+  res.json({ ok: true, token: issueToken(pubkey), pubkey, npub: npubOf(pubkey) });
+});
 
 // --- Mercados ---------------------------------------------------------------
 
@@ -28,19 +60,21 @@ app.get("/api/markets", (_req, res) => {
   res.json({ ok: true, demo: wallet.DEMO, markets: store.allMarkets().map(publicMarket) });
 });
 
-app.post("/api/markets", (req, res) => {
-  const { question, description, minutes_open, minutes_resolve } = req.body || {};
-  if (!question?.trim()) return res.status(400).json({ ok: false, error: "Falta la pregunta." });
+app.post("/api/markets", rateLimit(8, 10 * 60_000), (req, res) => {
+  const question = clean(req.body?.question, 280);
+  const description = clean(req.body?.description, 500);
+  if (question.length < 6) return res.status(400).json({ ok: false, error: "La pregunta es muy corta." });
   const now = Math.floor(Date.now() / 1000);
-  const closes = now + Math.max(1, Number(minutes_open) || 10) * 60;
-  const resolves = Math.max(closes, now + Math.max(1, Number(minutes_resolve) || 15) * 60);
-  const m = store.createMarket({ question: question.trim(), description: (description || "").trim(), closes_at: closes, resolves_at: resolves });
+  const clamp = (v, def, min, max) => Math.min(max, Math.max(min, Number(v) || def));
+  const closes = now + clamp(req.body?.minutes_open, 10, 1, 1440) * 60;
+  const resolves = Math.max(closes, now + clamp(req.body?.minutes_resolve, 15, 1, 1440) * 60);
+  const m = store.createMarket({ question, description, closes_at: closes, resolves_at: resolves });
   res.json({ ok: true, market: publicMarket(m) });
 });
 
 // --- Apuestas ---------------------------------------------------------------
 
-app.post("/api/markets/:id/bet", async (req, res) => {
+app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) => {
   const m = store.getMarket(req.params.id);
   if (!m) return res.status(404).json({ ok: false, error: "Apuesta no encontrada." });
   if (m.status !== "open" || Date.now() / 1000 > m.closes_at) {
@@ -48,16 +82,19 @@ app.post("/api/markets/:id/bet", async (req, res) => {
   }
   const side = req.body?.side === "si" ? "si" : req.body?.side === "no" ? "no" : null;
   const sats = Math.floor(Number(req.body?.sats));
-  const lnaddress = (req.body?.lnaddress || "").trim();
+  const lnaddress = clean(req.body?.lnaddress, 253);
   if (!side) return res.status(400).json({ ok: false, error: "Elige SI o NO." });
-  if (!sats || sats < 10) return res.status(400).json({ ok: false, error: "Minimo 10 sats." });
-  if (!wallet.DEMO && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(lnaddress)) {
-    return res.status(400).json({ ok: false, error: "Pon tu Lightning address (usuario@wallet.com) para cobrar si ganas." });
+  if (!Number.isFinite(sats) || sats < 10 || sats > 10_000_000) {
+    return res.status(400).json({ ok: false, error: "Cantidad invalida (entre 10 y 10.000.000 sats)." });
   }
+  if (!wallet.DEMO && !safeLnAddress(lnaddress)) {
+    return res.status(400).json({ ok: false, error: "Pon una Lightning address valida (usuario@wallet.com) para cobrar si ganas." });
+  }
+  const pubkey = verifyToken(req.body?.token) || null; // identidad opcional verificada
   try {
     const { invoice, payment_hash } = await wallet.createInvoice(sats, `El Oraculo · ${side.toUpperCase()} · ${m.question.slice(0, 60)}`);
     const bet = store.addBet(m, {
-      id: store.uid(), side, sats, lnaddress, invoice, payment_hash,
+      id: store.uid(), side, sats, lnaddress, pubkey, invoice, payment_hash,
       paid: false, payout_sats: 0, payout_status: null,
     });
     const qr = await QRCode.toDataURL(invoice, { margin: 1, width: 280 });
@@ -95,44 +132,48 @@ async function resolveMarket(m, { force = false } = {}) {
 
   let verdict = await resolveWithAI(m);
   if (!verdict) verdict = demoVerdict(m);
+  verdict.fuentes = sanitizeUrls(verdict.fuentes);
   m.verdict = verdict;
 
-  // reparto del bote
   const winners = store.computePayouts(m, verdict.outcome);
   for (const b of winners) {
     try {
-      if (b.lnaddress) {
+      if (b.lnaddress && safeLnAddress(b.lnaddress)) {
         await wallet.payToAddress(b.lnaddress, b.payout_sats, `El Oraculo: ganaste "${m.question.slice(0, 60)}"`);
         b.payout_status = "pagado";
       } else {
         b.payout_status = wallet.DEMO ? "pagado" : "sin-lnaddress";
       }
     } catch (e) {
-      b.payout_status = `error: ${e.message}`;
+      b.payout_status = "error-pago";
+      console.warn(`[oraculo] pago fallo: ${e.message}`);
     }
   }
   m.status = "resolved";
   store.update();
 
   const nostr = await publishVerdict(m);
-  m.nostr = nostr;
+  m.nostr = { published: nostr.published };
   store.update();
-  console.log(`[oraculo] veredicto: ${verdict.outcome.toUpperCase()} · nostr: ${nostr.published ? "publicado" : nostr.reason}`);
+  console.log(`[oraculo] veredicto: ${verdict.outcome.toUpperCase()} · nostr: ${nostr.published ? "publicado" : "no"}`);
 }
 
-// disparo manual (util para la demo en vivo: "resuelve AHORA")
-app.post("/api/markets/:id/resolve", async (req, res) => {
+// disparo manual: solo si la apuesta ya cerro (o en modo demo, para el pitch)
+app.post("/api/markets/:id/resolve", rateLimit(20, 10 * 60_000), (req, res) => {
   const m = store.getMarket(req.params.id);
   if (!m) return res.status(404).json({ ok: false, error: "No existe." });
   if (m.status !== "open") return res.status(400).json({ ok: false, error: `Estado: ${m.status}` });
-  resolveMarket(m, { force: true }); // async: el front hace polling
+  if (!wallet.DEMO && Date.now() / 1000 < m.closes_at) {
+    return res.status(403).json({ ok: false, error: "No se puede forzar la resolucion mientras las apuestas siguen abiertas." });
+  }
+  resolveMarket(m, { force: true }).catch((e) => console.error(e));
   res.json({ ok: true });
 });
 
 // vigilante: resuelve automaticamente lo que venza
 setInterval(() => {
   for (const m of store.allMarkets()) resolveMarket(m).catch((e) => console.error(e));
-}, 20000);
+}, 20_000);
 
 app.listen(PORT, () => {
   console.log(`🔮 El Oraculo -> http://localhost:${PORT}  (${wallet.DEMO ? "MODO DEMO: pagos simulados" : "wallet NWC real"})`);
