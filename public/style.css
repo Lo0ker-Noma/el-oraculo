@@ -120,6 +120,17 @@ h2 { font-size: 1.2rem; display: flex; align-items: center; gap: 10px; margin-bo
 .ftext b { font-size: .98rem; }
 .ftext span { color: var(--muted); font-size: .85rem; }
 
+/* cómo funciona */
+.howto h2 { margin-bottom: 18px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.step { position: relative; padding: 20px 18px; display: flex; flex-direction: column; gap: 6px; }
+.step .stepnum { position: absolute; top: 14px; right: 16px; font-size: .9rem; font-weight: 800; color: var(--violet); opacity: .55; }
+.step .stepicon { font-size: 1.7rem; margin-bottom: 4px; }
+.step b { font-size: 1rem; }
+.step span { color: var(--muted); font-size: .86rem; }
+.step i { color: #c9a6ff; font-style: italic; }
+@media (max-width: 820px) { .steps { grid-template-columns: 1fr; } }
+
 /* --- markets --- */
 .market .q { font-size: 1.15rem; font-weight: 700; margin-bottom: 3px; }
 .market .meta { color: var(--muted); font-size: .82rem; margin: 4px 0 12px; }
