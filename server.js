@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // EL ORÁCULO — apuestas sociales con bote Lightning resueltas por un agente IA.
-// Flujo: crear apuesta -> apostar si/no (invoice al bote) -> a la hora fijada,
-// el agente investiga en la web, dicta veredicto, lo publica en Nostr y
-// reparte el bote a las Lightning addresses ganadoras. Sin humano en el medio.
+// Flujo: crear apuesta -> apostar si/no (invoice al bote) -> al vencer, el agente
+// consulta sus herramientas, dicta veredicto, lo publica en Nostr y reparte el bote.
+//
+// Funciona igual en local (node server.js) y en serverless (Vercel), donde el
+// estado vive en Upstash y la resolucion se dispara por peticion, no por timer.
 
 import "./lib/env.js"; // carga .env antes que el resto de modulos
 import express from "express";
@@ -19,6 +21,7 @@ import { securityHeaders, rateLimit, safeLnAddress, sanitizeUrls, clean } from "
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5220;
+const EN_VERCEL = Boolean(process.env.VERCEL);
 
 const app = express();
 app.disable("x-powered-by");
@@ -54,40 +57,11 @@ app.post("/api/nostr/login", rateLimit(15, 10 * 60_000), (req, res) => {
   res.json({ ok: true, token: issueToken(pubkey), pubkey, npub: npubOf(pubkey) });
 });
 
-// --- Mercados ---------------------------------------------------------------
-
-app.get("/api/markets", (_req, res) => {
-  res.json({ ok: true, demo: wallet.DEMO, markets: store.allMarkets().map(publicMarket) });
-});
-
-app.post("/api/markets", rateLimit(8, 10 * 60_000), (req, res) => {
-  const question = clean(req.body?.question, 280);
-  const description = clean(req.body?.description, 500);
-  if (question.length < 6) return res.status(400).json({ ok: false, error: "La pregunta es muy corta." });
-  const now = Math.floor(Date.now() / 1000);
-  const MAX = now + 365 * 24 * 3600; // como mucho, un año vista
-  const clamp = (v, def, min, max) => Math.min(max, Math.max(min, Number(v) || def));
-  const parseTs = (v) => {
-    if (!v) return null;
-    const t = Math.floor(new Date(v).getTime() / 1000);
-    return Number.isFinite(t) ? t : null;
-  };
-  // fecha/hora exactas si vienen del calendario; si no, minutos (compatibilidad)
-  let closes = parseTs(req.body?.closes_at) ?? now + clamp(req.body?.minutes_open, 10, 1, 1440) * 60;
-  let resolves = parseTs(req.body?.resolves_at) ?? now + clamp(req.body?.minutes_resolve, 15, 1, 1440) * 60;
-  if (closes <= now) return res.status(400).json({ ok: false, error: "El cierre de apuestas debe ser futuro." });
-  if (closes > MAX || resolves > MAX) return res.status(400).json({ ok: false, error: "Fecha demasiado lejana (máximo 1 año)." });
-  resolves = Math.max(resolves, closes); // nunca resolver antes de cerrar
-  const m = store.createMarket({ question, description, closes_at: closes, resolves_at: resolves });
-  res.json({ ok: true, market: publicMarket(m) });
-});
-
-// --- Acceso: QR para que la sala entre desde el móvil ----------------------
+// --- Acceso: QR para que la sala entre desde el movil ----------------------
 
 app.get("/api/acceso", async (req, res) => {
-  // PUBLIC_URL manda; si no, deducimos del Host (con un túnel se actualiza solo)
   const base = (process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`).replace(/\/+$/, "");
-  const local = /localhost|127\.0\.0\.1|192\.168\.|10\.|\[::1\]/.test(base);
+  const local = /localhost|127\.0\.0\.1|192\.168\.|\[::1\]/.test(base);
   try {
     const qr = await QRCode.toDataURL(base, { margin: 1, width: 320 });
     res.json({ ok: true, url: base, qr, local });
@@ -96,9 +70,47 @@ app.get("/api/acceso", async (req, res) => {
   }
 });
 
+// --- Mercados ---------------------------------------------------------------
+
+app.get("/api/markets", async (_req, res) => {
+  const markets = await store.load();
+  res.json({
+    ok: true,
+    demo: wallet.DEMO,
+    // apuestas que ya deberian resolverse: el front las dispara
+    pendientes: markets.filter((m) => m.status === "open" && Date.now() / 1000 >= m.resolves_at).map((m) => m.id),
+    markets: markets.map(publicMarket),
+  });
+});
+
+app.post("/api/markets", rateLimit(8, 10 * 60_000), async (req, res) => {
+  const question = clean(req.body?.question, 280);
+  const description = clean(req.body?.description, 500);
+  if (question.length < 6) return res.status(400).json({ ok: false, error: "La pregunta es muy corta." });
+
+  const now = Math.floor(Date.now() / 1000);
+  const MAX = now + 365 * 24 * 3600; // como mucho, un año vista
+  const clamp = (v, def, min, max) => Math.min(max, Math.max(min, Number(v) || def));
+  const parseTs = (v) => {
+    if (!v) return null;
+    const t = Math.floor(new Date(v).getTime() / 1000);
+    return Number.isFinite(t) ? t : null;
+  };
+  let closes = parseTs(req.body?.closes_at) ?? now + clamp(req.body?.minutes_open, 10, 1, 1440) * 60;
+  let resolves = parseTs(req.body?.resolves_at) ?? now + clamp(req.body?.minutes_resolve, 15, 1, 1440) * 60;
+  if (closes <= now) return res.status(400).json({ ok: false, error: "El cierre de apuestas debe ser futuro." });
+  if (closes > MAX || resolves > MAX) return res.status(400).json({ ok: false, error: "Fecha demasiado lejana (máximo 1 año)." });
+  resolves = Math.max(resolves, closes); // nunca resolver antes de cerrar
+
+  const markets = await store.load();
+  const m = store.nuevoMercado({ question, description, closes_at: closes, resolves_at: resolves });
+  markets.unshift(m);
+  await store.save(markets);
+  res.json({ ok: true, market: publicMarket(m) });
+});
+
 // --- Oráculo: análisis previo y chat ---------------------------------------
 
-// Estimación de probabilidad al crear una apuesta, con datos reales.
 app.post("/api/analizar", rateLimit(12, 10 * 60_000), async (req, res) => {
   const question = clean(req.body?.question, 280);
   if (question.length < 6) return res.status(400).json({ ok: false, error: "La pregunta es muy corta." });
@@ -107,7 +119,6 @@ app.post("/api/analizar", rateLimit(12, 10 * 60_000), async (req, res) => {
   res.json({ ok: true, ...r, fuentes: sanitizeUrls(r.fuentes) });
 });
 
-// Chat: preguntar cualquier cosa al oráculo.
 app.post("/api/preguntar", rateLimit(20, 10 * 60_000), async (req, res) => {
   const pregunta = clean(req.body?.pregunta, 300);
   if (pregunta.length < 3) return res.status(400).json({ ok: false, error: "Escribe una pregunta." });
@@ -119,7 +130,8 @@ app.post("/api/preguntar", rateLimit(20, 10 * 60_000), async (req, res) => {
 // --- Apuestas ---------------------------------------------------------------
 
 app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) => {
-  const m = store.getMarket(req.params.id);
+  const markets = await store.load();
+  const m = store.find(markets, req.params.id);
   if (!m) return res.status(404).json({ ok: false, error: "Apuesta no encontrada." });
   if (m.status !== "open" || Date.now() / 1000 > m.closes_at) {
     return res.status(400).json({ ok: false, error: "Las apuestas estan cerradas." });
@@ -137,10 +149,12 @@ app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) =>
   const pubkey = verifyToken(req.body?.token) || null; // identidad opcional verificada
   try {
     const { invoice, payment_hash } = await wallet.createInvoice(sats, `El Oraculo · ${side.toUpperCase()} · ${m.question.slice(0, 60)}`);
-    const bet = store.addBet(m, {
+    const bet = {
       id: store.uid(), side, sats, lnaddress, pubkey, invoice, payment_hash,
       paid: false, payout_sats: 0, payout_status: null,
-    });
+    };
+    m.bets.push(bet);
+    await store.save(markets);
     const qr = await QRCode.toDataURL(invoice, { margin: 1, width: 280 });
     res.json({ ok: true, bet_id: bet.id, invoice, qr, demo: wallet.DEMO });
   } catch (e) {
@@ -149,30 +163,28 @@ app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) =>
 });
 
 app.get("/api/markets/:id/bet/:betId", async (req, res) => {
-  const m = store.getMarket(req.params.id);
+  const markets = await store.load();
+  const m = store.find(markets, req.params.id);
   const bet = m?.bets.find((b) => b.id === req.params.betId);
   if (!bet) return res.status(404).json({ ok: false, error: "Apuesta no encontrada." });
   if (!bet.paid && (await wallet.isPaid(bet.payment_hash))) {
     bet.paid = true;
-    store.update();
+    await store.save(markets);
   }
   res.json({ ok: true, paid: bet.paid, pools: store.pools(m) });
 });
 
 // --- Resolucion (el agente) -------------------------------------------------
 
-async function resolveMarket(m, { force = false } = {}) {
-  if (m.status !== "open") return;
-  if (!force && Date.now() / 1000 < m.resolves_at) return;
+async function resolveMarket(markets, m) {
   m.status = "resolving";
-  store.update();
+  await store.save(markets);
   console.log(`[oraculo] resolviendo: "${m.question}"`);
 
-  // confirmar pagos pendientes antes de repartir (por si algun modal se cerro sin pollear)
+  // confirmar pagos pendientes antes de repartir
   for (const b of m.bets) {
     if (!b.paid && (await wallet.isPaid(b.payment_hash))) b.paid = true;
   }
-  store.update();
 
   let verdict = await resolveWithAI(m);
   if (!verdict) verdict = demoVerdict(m);
@@ -194,31 +206,52 @@ async function resolveMarket(m, { force = false } = {}) {
     }
   }
   m.status = "resolved";
-  store.update();
 
   const nostr = await publishVerdict(m);
   m.nostr = { published: nostr.published };
-  store.update();
+  await store.save(markets);
   console.log(`[oraculo] veredicto: ${verdict.outcome.toUpperCase()} · nostr: ${nostr.published ? "publicado" : "no"}`);
 }
 
-// disparo manual: solo si la apuesta ya cerro (o en modo demo, para el pitch)
-app.post("/api/markets/:id/resolve", rateLimit(20, 10 * 60_000), (req, res) => {
-  const m = store.getMarket(req.params.id);
+// Disparo de la resolucion. En serverless no hay temporizador: el front llama
+// aqui cuando una apuesta vence (o el presentador pulsa "resolver ya").
+app.post("/api/markets/:id/resolve", rateLimit(20, 10 * 60_000), async (req, res) => {
+  const markets = await store.load();
+  const m = store.find(markets, req.params.id);
   if (!m) return res.status(404).json({ ok: false, error: "No existe." });
   if (m.status !== "open") return res.status(400).json({ ok: false, error: `Estado: ${m.status}` });
-  if (!wallet.DEMO && Date.now() / 1000 < m.closes_at) {
+  const vencida = Date.now() / 1000 >= m.resolves_at;
+  if (!vencida && !wallet.DEMO && Date.now() / 1000 < m.closes_at) {
     return res.status(403).json({ ok: false, error: "No se puede forzar la resolucion mientras las apuestas siguen abiertas." });
   }
-  resolveMarket(m, { force: true }).catch((e) => console.error(e));
-  res.json({ ok: true });
+  try {
+    await resolveMarket(markets, m);
+    res.json({ ok: true, market: publicMarket(m) });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, error: "Fallo al resolver." });
+  }
 });
 
-// vigilante: resuelve automaticamente lo que venza
-setInterval(() => {
-  for (const m of store.allMarkets()) resolveMarket(m).catch((e) => console.error(e));
-}, 20_000);
+// En local mantenemos el vigilante; en Vercel lo dispara el front.
+if (!EN_VERCEL) {
+  setInterval(async () => {
+    try {
+      const markets = await store.load();
+      const due = markets.filter((m) => m.status === "open" && Date.now() / 1000 >= m.resolves_at);
+      for (const m of due) await resolveMarket(markets, m);
+    } catch (e) {
+      console.error(e);
+    }
+  }, 20_000);
 
-app.listen(PORT, () => {
-  console.log(`🔮 El Oraculo -> http://localhost:${PORT}  (${wallet.DEMO ? "MODO DEMO: pagos simulados" : "wallet NWC real"})`);
-});
+  app.listen(PORT, () => {
+    console.log(
+      `🔮 El Oraculo -> http://localhost:${PORT}  ` +
+        `(${wallet.DEMO ? "MODO DEMO: pagos simulados" : "wallet NWC real"}` +
+        `${store.REMOTO ? ", estado en Upstash" : ", estado en fichero"})`
+    );
+  });
+}
+
+export default app;

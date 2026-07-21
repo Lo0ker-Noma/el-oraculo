@@ -314,11 +314,17 @@ document.addEventListener("click", (e) => {
 
 // --- Loop ------------------------------------------------------------------
 
+const disparadas = new Set(); // para no lanzar dos veces la misma resolución
+
 async function refresh(force = false) {
   try {
     const j = await api("/api/markets");
     DEMO = j.demo;
     lastMarkets = j.markets;
+    // en serverless no hay temporizador en el servidor: disparamos lo vencido
+    for (const id of j.pendientes || []) {
+      if (!disparadas.has(id)) { disparadas.add(id); resolveNow(id); }
+    }
     const sig = DEMO + "|" + JSON.stringify(j.markets);
     if (!force && sig === lastSig) return; // nada cambió: no repintar (no borrar el formulario)
     lastSig = sig;
