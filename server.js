@@ -82,6 +82,20 @@ app.post("/api/markets", rateLimit(8, 10 * 60_000), (req, res) => {
   res.json({ ok: true, market: publicMarket(m) });
 });
 
+// --- Acceso: QR para que la sala entre desde el móvil ----------------------
+
+app.get("/api/acceso", async (req, res) => {
+  // PUBLIC_URL manda; si no, deducimos del Host (con un túnel se actualiza solo)
+  const base = (process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`).replace(/\/+$/, "");
+  const local = /localhost|127\.0\.0\.1|192\.168\.|10\.|\[::1\]/.test(base);
+  try {
+    const qr = await QRCode.toDataURL(base, { margin: 1, width: 320 });
+    res.json({ ok: true, url: base, qr, local });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // --- Oráculo: análisis previo y chat ---------------------------------------
 
 // Estimación de probabilidad al crear una apuesta, con datos reales.

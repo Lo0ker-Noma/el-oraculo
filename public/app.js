@@ -266,6 +266,22 @@ async function preguntar() {
   }
 }
 
+// --- Acceso: QR para la sala ------------------------------------------------
+
+async function cargarAcceso() {
+  try {
+    const j = await api("/api/acceso");
+    $("accesoQr").src = j.qr;
+    $("accesoUrl").textContent = j.url;
+    $("accesoNota").textContent = j.local
+      ? "⚠️ Esta dirección es local: solo funciona en tu red. Para el pitch, expón el servidor con un túnel (o define PUBLIC_URL) y el QR se actualizará solo."
+      : "Cualquiera con este código puede entrar y probarlo ahora mismo.";
+  } catch {
+    $("accesoUrl").textContent = "no disponible";
+  }
+}
+cargarAcceso();
+
 // listeners (una sola vez)
 $("btnAnalizar").addEventListener("click", analizar);
 $("btnChat").addEventListener("click", preguntar);

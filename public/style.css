@@ -137,6 +137,15 @@ input[type=datetime-local], .stepper input[type=datetime-local] {
 }
 input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
 
+/* acceso (QR para la sala) */
+.accesoRow { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.accesoQr { width: 190px; height: 190px; border-radius: 16px; background: #fff; padding: 10px; flex: none; }
+.accesoInfo { flex: 1; min-width: 220px; }
+.accesoUrl {
+  font-family: ui-monospace, SFMono-Regular, monospace; font-size: 1.05rem; font-weight: 700;
+  color: var(--violet); word-break: break-all; margin-bottom: 8px;
+}
+
 /* chat con el oráculo */
 #chatLog { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; margin: 12px 0; }
 #chatLog:empty { display: none; }
