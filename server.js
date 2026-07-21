@@ -12,7 +12,7 @@ import QRCode from "qrcode";
 import { nip19 } from "nostr-tools";
 import * as store from "./lib/store.js";
 import * as wallet from "./lib/wallet.js";
-import { resolveWithAI, demoVerdict } from "./lib/oracle.js";
+import { resolveWithAI, demoVerdict, analizarProbabilidad, preguntarOraculo } from "./lib/oracle.js";
 import { publishVerdict } from "./lib/nostr.js";
 import { verifyNip98, issueToken, verifyToken } from "./lib/auth.js";
 import { securityHeaders, rateLimit, safeLnAddress, sanitizeUrls, clean } from "./lib/security.js";
@@ -65,11 +65,41 @@ app.post("/api/markets", rateLimit(8, 10 * 60_000), (req, res) => {
   const description = clean(req.body?.description, 500);
   if (question.length < 6) return res.status(400).json({ ok: false, error: "La pregunta es muy corta." });
   const now = Math.floor(Date.now() / 1000);
+  const MAX = now + 365 * 24 * 3600; // como mucho, un año vista
   const clamp = (v, def, min, max) => Math.min(max, Math.max(min, Number(v) || def));
-  const closes = now + clamp(req.body?.minutes_open, 10, 1, 1440) * 60;
-  const resolves = Math.max(closes, now + clamp(req.body?.minutes_resolve, 15, 1, 1440) * 60);
+  const parseTs = (v) => {
+    if (!v) return null;
+    const t = Math.floor(new Date(v).getTime() / 1000);
+    return Number.isFinite(t) ? t : null;
+  };
+  // fecha/hora exactas si vienen del calendario; si no, minutos (compatibilidad)
+  let closes = parseTs(req.body?.closes_at) ?? now + clamp(req.body?.minutes_open, 10, 1, 1440) * 60;
+  let resolves = parseTs(req.body?.resolves_at) ?? now + clamp(req.body?.minutes_resolve, 15, 1, 1440) * 60;
+  if (closes <= now) return res.status(400).json({ ok: false, error: "El cierre de apuestas debe ser futuro." });
+  if (closes > MAX || resolves > MAX) return res.status(400).json({ ok: false, error: "Fecha demasiado lejana (máximo 1 año)." });
+  resolves = Math.max(resolves, closes); // nunca resolver antes de cerrar
   const m = store.createMarket({ question, description, closes_at: closes, resolves_at: resolves });
   res.json({ ok: true, market: publicMarket(m) });
+});
+
+// --- Oráculo: análisis previo y chat ---------------------------------------
+
+// Estimación de probabilidad al crear una apuesta, con datos reales.
+app.post("/api/analizar", rateLimit(12, 10 * 60_000), async (req, res) => {
+  const question = clean(req.body?.question, 280);
+  if (question.length < 6) return res.status(400).json({ ok: false, error: "La pregunta es muy corta." });
+  const r = await analizarProbabilidad(question);
+  if (!r) return res.status(503).json({ ok: false, error: "El oráculo no puede analizar ahora (IA sin configurar o cuota diaria agotada)." });
+  res.json({ ok: true, ...r, fuentes: sanitizeUrls(r.fuentes) });
+});
+
+// Chat: preguntar cualquier cosa al oráculo.
+app.post("/api/preguntar", rateLimit(20, 10 * 60_000), async (req, res) => {
+  const pregunta = clean(req.body?.pregunta, 300);
+  if (pregunta.length < 3) return res.status(400).json({ ok: false, error: "Escribe una pregunta." });
+  const r = await preguntarOraculo(pregunta);
+  if (!r) return res.status(503).json({ ok: false, error: "El oráculo guarda silencio (IA sin configurar o cuota diaria agotada)." });
+  res.json({ ok: true, ...r, fuentes: sanitizeUrls(r.fuentes) });
 });
 
 // --- Apuestas ---------------------------------------------------------------

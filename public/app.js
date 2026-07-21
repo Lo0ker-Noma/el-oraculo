@@ -69,10 +69,11 @@ async function createMarket() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         question: $("q").value, description: $("desc").value,
-        minutes_open: $("minOpen").value, minutes_resolve: $("minResolve").value,
+        closes_at: $("closesAt").value, resolves_at: $("resolvesAt").value,
       }),
     });
     $("q").value = $("desc").value = "";
+    $("analisisBox").classList.add("hidden");
     refresh(true);
   } catch (e) {
     $("createMsg").textContent = e.message;
@@ -183,7 +184,92 @@ async function resolveNow(id) {
   refresh(true);
 }
 
+// --- Calendario: valores por defecto y atajos ------------------------------
+
+const paraInput = (d) => {
+  const p = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return p.toISOString().slice(0, 16);
+};
+function fijarPlazo(minutos) {
+  const cierre = new Date(Date.now() + minutos * 60000);
+  const resol = new Date(cierre.getTime() + Math.max(5, Math.round(minutos * 0.2)) * 60000);
+  $("closesAt").value = paraInput(cierre);
+  $("resolvesAt").value = paraInput(resol);
+}
+fijarPlazo(15); // por defecto: cierra en 15 min, resuelve 5 min después
+document.querySelectorAll("[data-preset]").forEach((b) =>
+  b.addEventListener("click", () => fijarPlazo(Number(b.dataset.preset)))
+);
+
+// --- Análisis de probabilidad ----------------------------------------------
+
+async function analizar() {
+  const box = $("analisisBox"), btn = $("btnAnalizar");
+  const question = $("q").value.trim();
+  box.classList.remove("hidden");
+  if (question.length < 6) { box.innerHTML = `<span class="muted">Escribe primero la pregunta.</span>`; return; }
+  btn.disabled = true;
+  box.innerHTML = `<span class="muted">🔮 Consultando fuentes reales…</span>`;
+  try {
+    const j = await api("/api/analizar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const p = j.probabilidad;
+    const color = p >= 60 ? "var(--green)" : p <= 40 ? "var(--red)" : "var(--violet)";
+    box.innerHTML =
+      `<div class="probRow"><div class="probNum" style="color:${color}">${p}%</div>
+         <div class="probTxt"><b>de probabilidad de que salga SÍ</b><br><span class="muted">${esc(j.razonamiento)}</span></div></div>
+       <div class="probBar"><div style="width:${p}%;background:${color}"></div></div>` +
+      (j.fuentes?.length ? `<div class="sources">Fuentes: ${j.fuentes.filter(httpOnly).map((f) => `<a href="${esc(f)}" target="_blank" rel="noopener noreferrer">${esc(shortUrl(f))}</a>`).join(" · ")}</div>` : "");
+  } catch (e) {
+    box.innerHTML = `<span class="error">${esc(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// --- Chat con el oráculo ----------------------------------------------------
+
+function mensaje(texto, clase) {
+  const d = document.createElement("div");
+  d.className = "msg " + clase;
+  d.textContent = texto;
+  $("chatLog").appendChild(d);
+  $("chatLog").scrollTop = $("chatLog").scrollHeight;
+  return d;
+}
+
+async function preguntar() {
+  const inp = $("chatInput"), pregunta = inp.value.trim();
+  if (pregunta.length < 3) return;
+  mensaje(pregunta, "yo");
+  inp.value = "";
+  const pensando = mensaje("🔮 consultando…", "oraculo pensando");
+  try {
+    const j = await api("/api/preguntar", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pregunta }),
+    });
+    pensando.className = "msg oraculo";
+    pensando.textContent = j.respuesta;
+    const f = (j.fuentes || []).filter(httpOnly);
+    if (f.length) {
+      const s = document.createElement("div");
+      s.className = "sources";
+      s.innerHTML = "Fuentes: " + f.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(shortUrl(u))}</a>`).join(" · ");
+      pensando.appendChild(s);
+    }
+  } catch (e) {
+    pensando.className = "msg oraculo";
+    pensando.textContent = "⚠️ " + e.message;
+  }
+}
+
 // listeners (una sola vez)
+$("btnAnalizar").addEventListener("click", analizar);
+$("btnChat").addEventListener("click", preguntar);
+$("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") preguntar(); });
 $("btnCreate").addEventListener("click", createMarket);
 $("payClose").addEventListener("click", closePay);
 $("nostrBtn").addEventListener("click", () => { if (auth) { auth = null; renderAuth(); } else nostrLogin(); });

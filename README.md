@@ -113,4 +113,4 @@ frontend: vanilla HTML/CSS/JS · QR de pago · estado en vivo
 
 ## Licencia
 
-MIT — hecho con 🔮⚡ por LookerLABS para La Crypta.
+MIT — hecho con 🔮⚡ por LookerNoma para La Crypta.

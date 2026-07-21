@@ -44,11 +44,24 @@
       <textarea id="desc" maxlength="280" rows="2" placeholder="Contexto opcional (criterio de resolución, fuente preferida...)"></textarea>
       <span class="counter" id="descCount">0/280</span>
     </div>
+    <div class="analisis">
+      <button id="btnAnalizar" class="glass-btn sm">📊 ¿Qué probabilidad hay? — analizar con datos reales</button>
+      <div id="analisisBox" class="hidden"></div>
+    </div>
+
     <div class="create-row">
-      <label class="stepper"><span class="ico">⏱</span> Apuestas abiertas <input id="minOpen" type="number" value="5" min="1" max="1440"> min</label>
-      <label class="stepper"><span class="ico">⏳</span> Se resuelve en <input id="minResolve" type="number" value="6" min="1" max="1440"> min</label>
+      <label class="stepper"><span class="ico">🗓</span> Cierran las apuestas
+        <input id="closesAt" type="datetime-local"></label>
+      <label class="stepper"><span class="ico">⚖️</span> El oráculo resuelve
+        <input id="resolvesAt" type="datetime-local"></label>
       <button id="btnCreate" class="glass-btn primary">✦ Crear apuesta</button>
     </div>
+    <p class="muted atajos">Atajos:
+      <button class="linkbtn" data-preset="15">15 min</button> ·
+      <button class="linkbtn" data-preset="60">1 h</button> ·
+      <button class="linkbtn" data-preset="1440">1 día</button> ·
+      <button class="linkbtn" data-preset="10080">1 semana</button>
+    </p>
     <p id="createMsg" class="error"></p>
   </section>
 
@@ -86,6 +99,16 @@
     <div class="feature card glass"><div class="ftile">🛡️</div><div class="ftext"><b>Sin intermediarios</b><span>Sin casa de apuestas. Sin árbitro humano.</span></div></div>
     <div class="feature card glass"><div class="ftile">⚡</div><div class="ftext"><b>Pagos por Lightning</b><span>Botes y recompensas en satoshis.</span></div></div>
     <div class="feature card glass"><div class="ftile">📖</div><div class="ftext"><b>Transparencia</b><span>Veredictos con fuentes verificables por IA.</span></div></div>
+  </section>
+
+  <section id="chat" class="card glass">
+    <h2><span class="spark">💬</span> Pregúntale al oráculo</h2>
+    <p class="muted">Consulta lo que quieras: consultará sus herramientas y responderá citando fuentes.</p>
+    <div id="chatLog"></div>
+    <div class="chatRow">
+      <input id="chatInput" type="text" maxlength="300" placeholder="¿A cuánto está Bitcoin? ¿Lloverá mañana en Madrid?">
+      <button id="btnChat" class="glass-btn primary">Preguntar</button>
+    </div>
   </section>
 
   <section id="apuestas">

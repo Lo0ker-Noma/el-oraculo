@@ -120,6 +120,35 @@ h2 { font-size: 1.2rem; display: flex; align-items: center; gap: 10px; margin-bo
 .ftext b { font-size: .98rem; }
 .ftext span { color: var(--muted); font-size: .85rem; }
 
+/* análisis de probabilidad */
+.analisis { margin: 12px 0 4px; }
+#analisisBox { margin-top: 10px; padding: 14px; border-radius: 14px; background: rgba(169, 112, 255, 0.08); border: 1px solid rgba(169, 112, 255, 0.22); }
+.probRow { display: flex; align-items: center; gap: 16px; }
+.probNum { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+.probTxt { font-size: .9rem; }
+.probBar { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.08); margin-top: 12px; overflow: hidden; }
+.probBar div { height: 100%; border-radius: 99px; transition: width .5s ease; }
+.atajos { margin: 8px 0 0; font-size: .82rem; }
+.atajos .linkbtn { font-size: .82rem; }
+input[type=datetime-local], .stepper input[type=datetime-local] {
+  font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6);
+  border: 1px solid var(--stroke); border-radius: 12px; padding: 9px 11px; outline: none;
+  width: auto; min-width: 215px;
+}
+input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
+
+/* chat con el oráculo */
+#chatLog { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; margin: 12px 0; }
+#chatLog:empty { display: none; }
+.msg { padding: 11px 15px; border-radius: 14px; max-width: 88%; font-size: .92rem; white-space: pre-wrap; }
+.msg.yo { align-self: flex-end; background: linear-gradient(135deg, rgba(169, 112, 255, .3), rgba(124, 77, 255, .22)); border: 1px solid rgba(169, 112, 255, .35); }
+.msg.oraculo { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--stroke); }
+.msg.pensando { opacity: .7; animation: pulse 1.2s infinite; }
+.msg .sources { margin-top: 8px; font-size: .76rem; }
+.chatRow { display: flex; gap: 10px; }
+.chatRow input { flex: 1; font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; outline: none; }
+.chatRow input:focus { border-color: rgba(169, 112, 255, 0.6); }
+
 /* cómo funciona */
 .howto h2 { margin-bottom: 18px; }
 .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
