@@ -42,21 +42,35 @@ Crea un `.env` (ver `.env.example`):
 | Variable | Qué habilita |
 |---|---|
 | `NWC_URL` | Wallet del oráculo (Alby/LNbits/LaWallet vía [NWC](https://nwc.dev)). Cobra las apuestas de verdad y **paga los premios** a la Lightning address de cada ganador. |
-| `XAI_API_KEY` | **(recomendado)** El agente investiga con **Live Search de Grok (xAI)** y cita las fuentes. |
+| `GEMINI_API_KEY` | **(recomendado — gratis)** El agente razona con **Gemini** ([AI Studio](https://aistudio.google.com), sin tarjeta). ⚠️ Free tier: **20 peticiones/día por modelo**. |
+| `TAVILY_API_KEY` | *(opcional)* Añade la herramienta de **búsqueda web general** al agente, para apuestas de noticias/deportes. |
+| `XAI_API_KEY` | Alternativa: Grok (xAI). Requiere créditos de pago. |
 | `ANTHROPIC_API_KEY` | Alternativa: **Claude Opus 4.8** + web search server tool + salida con schema. |
 | `ORACLE_NSEC` | Identidad Nostr del oráculo: publica cada veredicto como nota pública (kind 1). |
 | `SESSION_SECRET` | Firma los tokens del **login opcional con Nostr** (NIP-07). Si falta, se genera aleatorio al arrancar. |
 
 Cada pieza degrada con elegancia: puedes activar solo la que quieras.
 
-## Cómo decide el oráculo
+## Cómo decide el oráculo (tool use)
 
-El agente recibe la pregunta y la fecha, y opera con reglas de juez:
+El agente **no responde de memoria**: usa herramientas reales y cita lo que consultó.
 
-1. **Busca en la web** (hasta 6 búsquedas) — nunca responde de memoria algo que pueda haber cambiado.
-2. Es **estrictamente literal** con el texto de la apuesta.
-3. Ante ambigüedad o falta de evidencia → **INDETERMINADO** y se devuelven las apuestas.
-4. Devuelve un veredicto estructurado: `{outcome, confianza, razonamiento, fuentes[]}` (salida JSON con schema, no texto libre).
+1. **Elige herramienta** — por heurística en los casos evidentes (ahorra cuota) o
+   dejando que el modelo decida cuando la pregunta es rara.
+2. **Ejecutamos la herramienta** ([`lib/tools.js`](./lib/tools.js), todas gratuitas y sin API key):
+   | Herramienta | Fuente | Para |
+   |---|---|---|
+   | `precio_cripto` | CoinGecko | cotizaciones (BTC, ETH, SOL…) |
+   | `tiempo` | Open-Meteo | lluvia/temperatura de un lugar y fecha |
+   | `wikipedia` | Wikipedia | hechos estables |
+   | `busqueda_web` | Tavily *(opcional)* | noticias, deportes, actualidad |
+3. **Dicta veredicto** con la evidencia y las URLs delante. Es **estrictamente literal**
+   con el texto de la apuesta y, ante ambigüedad o falta de evidencia,
+   responde **INDETERMINADO** (se devuelven las apuestas).
+4. Salida estructurada: `{outcome, confianza, razonamiento, fuentes[]}`.
+
+> Ejemplo real: *"¿Va a llover hoy en Buenos Aires?"* → consultó Open-Meteo (0,3 mm, 16 %) y
+> falló **INDETERMINADO** razonando que *"el día aún está en curso"*. Un juez prudente.
 
 El reparto: los ganadores se llevan **todo el bote** pro-rata a su apuesta.
 Si nadie acierta o es indeterminado, devolución íntegra.
