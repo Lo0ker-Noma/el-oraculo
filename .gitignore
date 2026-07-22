@@ -4,3 +4,4 @@ data/markets.json
 .DS_Store
 *.log
 Oraculo logo.png
+.vercel

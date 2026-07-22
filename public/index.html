@@ -115,11 +115,22 @@
 
   <section id="chat" class="card glass">
     <h2><span class="spark">💬</span> Pregúntale al oráculo</h2>
-    <p class="muted">Consulta lo que quieras: consultará sus herramientas y responderá citando fuentes.</p>
+    <p class="muted">
+      Un oráculo que sabe la verdad no solo resuelve apuestas: también resuelve tus dudas.
+      Pregúntale lo que quieras sobre Bitcoin y Lightning —canales, custodia, NWC, seeds—
+      y responderá consultando sus herramientas y citando sus fuentes. Privado: la
+      respuesta es solo para ti, no se publica en ningún sitio.
+    </p>
     <div id="chatLog"></div>
     <div class="chatRow">
-      <input id="chatInput" type="text" maxlength="300" placeholder="¿A cuánto está Bitcoin? ¿Lloverá mañana en Madrid?">
+      <input id="chatInput" type="text" maxlength="300" placeholder="¿A cuánto está Bitcoin? ¿Cómo funciona un canal Lightning?">
       <button id="btnChat" class="glass-btn primary">Preguntar</button>
+    </div>
+    <div class="chips">
+      <button class="chip" data-q="¿Cómo funciona un canal Lightning?">canal Lightning</button>
+      <button class="chip" data-q="¿Qué es Nostr Wallet Connect (NWC)?">qué es NWC</button>
+      <button class="chip" data-q="¿Cómo guardo de forma segura la seed phrase de mi wallet?">guardar mi seed</button>
+      <button class="chip" data-q="¿A cuánto está el precio de Bitcoin ahora?">precio de Bitcoin</button>
     </div>
   </section>
 

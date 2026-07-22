@@ -286,6 +286,10 @@ cargarAcceso();
 $("btnAnalizar").addEventListener("click", analizar);
 $("btnChat").addEventListener("click", preguntar);
 $("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") preguntar(); });
+document.querySelectorAll(".chip[data-q]").forEach((c) => c.addEventListener("click", () => {
+  $("chatInput").value = c.dataset.q;
+  preguntar();
+}));
 $("btnCreate").addEventListener("click", createMarket);
 $("payClose").addEventListener("click", closePay);
 $("nostrBtn").addEventListener("click", () => { if (auth) { auth = null; renderAuth(); } else nostrLogin(); });

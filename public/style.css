@@ -157,6 +157,13 @@ input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
 .chatRow { display: flex; gap: 10px; }
 .chatRow input { flex: 1; font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; outline: none; }
 .chatRow input:focus { border-color: rgba(169, 112, 255, 0.6); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip {
+  font-size: .8rem; font-weight: 500; padding: 7px 14px; border-radius: 999px;
+  background: rgba(169, 112, 255, 0.1); border: 1px solid rgba(169, 112, 255, 0.28);
+  color: #d9c9ff; cursor: pointer; transition: background .15s ease;
+}
+.chip:hover { background: rgba(169, 112, 255, 0.2); }
 
 /* cómo funciona */
 .howto h2 { margin-bottom: 18px; }
