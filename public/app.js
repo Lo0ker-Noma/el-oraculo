@@ -285,7 +285,10 @@ cargarAcceso();
 // listeners (una sola vez)
 $("btnAnalizar").addEventListener("click", analizar);
 $("btnChat").addEventListener("click", preguntar);
-$("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") preguntar(); });
+// Enter envia; Shift+Enter hace salto de linea
+$("chatInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); preguntar(); }
+});
 $("btnCreate").addEventListener("click", createMarket);
 $("payClose").addEventListener("click", closePay);
 $("nostrBtn").addEventListener("click", () => { if (auth) { auth = null; renderAuth(); } else nostrLogin(); });

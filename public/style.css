@@ -158,19 +158,19 @@ input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
 /* globo para preguntar al oráculo: ancho completo, encima de "Nueva apuesta" */
 .askBarWrap { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 0; }
 .askBar {
-  display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 20px;
-  border-radius: 999px;
+  display: flex; align-items: center; gap: 14px; padding: 16px 16px 16px 22px;
+  border-radius: 28px;
 }
-.askIcon { font-size: 1.25rem; flex: none; filter: drop-shadow(0 0 10px rgba(169, 112, 255, 0.5)); }
-.askBar input {
-  flex: 1; font: inherit; color: var(--text);
+.askIcon { font-size: 1.5rem; flex: none; filter: drop-shadow(0 0 10px rgba(169, 112, 255, 0.5)); }
+.askBar textarea {
+  flex: 1; font: inherit; font-size: 1.05rem; line-height: 1.5; color: var(--text);
   background: rgba(10, 8, 18, 0.6); border: 1px solid var(--stroke);
-  border-radius: 999px; outline: none; padding: 12px 18px;
+  border-radius: 18px; outline: none; padding: 14px 18px; resize: none;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.askBar input::placeholder { color: var(--muted); }
-.askBar input:focus { border-color: rgba(169, 112, 255, 0.6); box-shadow: 0 0 0 3px rgba(169, 112, 255, 0.15); }
-.askBar .primary { flex: none; white-space: nowrap; }
+.askBar textarea::placeholder { color: var(--muted); }
+.askBar textarea:focus { border-color: rgba(169, 112, 255, 0.6); box-shadow: 0 0 0 3px rgba(169, 112, 255, 0.15); }
+.askBar .primary { flex: none; white-space: nowrap; padding: 14px 24px; }
 .askBarWrap #chatLog { margin: 0; }
 
 /* cómo funciona */
