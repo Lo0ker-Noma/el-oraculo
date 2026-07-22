@@ -155,8 +155,8 @@ input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
 .msg.pensando { opacity: .7; animation: pulse 1.2s infinite; }
 .msg .sources { margin-top: 8px; font-size: .76rem; }
 
-/* globo para preguntar al oráculo, justo encima de "Nueva apuesta" */
-.askBarWrap { display: flex; flex-direction: column; gap: 10px; }
+/* globo para preguntar al oráculo: ancho completo, encima de "Nueva apuesta" */
+.askBarWrap { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 0; }
 .askBar {
   display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 20px;
   border-radius: 999px;
