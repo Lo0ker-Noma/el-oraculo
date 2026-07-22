@@ -154,16 +154,20 @@ input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
 .msg.oraculo { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--stroke); }
 .msg.pensando { opacity: .7; animation: pulse 1.2s infinite; }
 .msg .sources { margin-top: 8px; font-size: .76rem; }
-.chatRow { display: flex; gap: 10px; }
-.chatRow input { flex: 1; font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6); border: 1px solid var(--stroke); border-radius: 12px; padding: 12px 14px; outline: none; }
-.chatRow input:focus { border-color: rgba(169, 112, 255, 0.6); }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.chip {
-  font-size: .8rem; font-weight: 500; padding: 7px 14px; border-radius: 999px;
-  background: rgba(169, 112, 255, 0.1); border: 1px solid rgba(169, 112, 255, 0.28);
-  color: #d9c9ff; cursor: pointer; transition: background .15s ease;
+
+/* globo flotante para preguntar, arriba del todo */
+.askBarWrap { max-width: 900px; margin: 0 auto 18px; padding: 0 8px; }
+.askBar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 18px;
+  border-radius: 999px;
 }
-.chip:hover { background: rgba(169, 112, 255, 0.2); }
+.askIcon { font-size: 1.2rem; flex: none; filter: drop-shadow(0 0 10px rgba(169, 112, 255, 0.5)); }
+.askBar input {
+  flex: 1; font: inherit; color: var(--text); background: transparent; border: 0; outline: none; padding: 8px 4px;
+}
+.askBar input::placeholder { color: var(--muted); }
+.askBar .primary { flex: none; white-space: nowrap; }
+.askBarWrap #chatLog { max-width: 100%; padding: 0 8px; }
 
 /* cómo funciona */
 .howto h2 { margin-bottom: 18px; }
