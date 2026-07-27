@@ -151,7 +151,8 @@ app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) =>
     const { invoice, payment_hash } = await wallet.createInvoice(sats, `El Oraculo · ${side.toUpperCase()} · ${m.question.slice(0, 60)}`);
     const bet = {
       id: store.uid(), side, sats, lnaddress, pubkey, invoice, payment_hash,
-      paid: false, payout_sats: 0, payout_status: null,
+      invoiced_at: Math.floor(Date.now() / 1000),
+      paid: false, paid_match: null, payout_sats: 0, payout_status: null,
     };
     m.bets.push(bet);
     await store.save(markets);
@@ -162,13 +163,32 @@ app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) =>
   }
 });
 
+// Confirma si una apuesta esta pagada. En DEMO usa el temporizador simulado.
+// En real, como Primal no reporta el estado por payment_hash, buscamos un
+// ingreso liquidado del mismo importe posterior a la creacion de la invoice
+// que no haya sido ya asignado a otra apuesta del mismo mercado.
+async function confirmarPago(m, bet) {
+  if (bet.paid) return true;
+  if (wallet.DEMO) {
+    if (await wallet.isPaid(bet.payment_hash)) bet.paid = true;
+    return bet.paid;
+  }
+  const ingresos = await wallet.ingresosLiquidados();
+  const usados = new Set(m.bets.filter((b) => b.paid && b.paid_match != null).map((b) => b.paid_match));
+  const desde = (bet.invoiced_at || 0) - 30; // margen por desfase de reloj
+  const match = ingresos.find(
+    (t) => t.sats === bet.sats && t.settled_at >= desde && !usados.has(t.settled_at)
+  );
+  if (match) { bet.paid = true; bet.paid_match = match.settled_at; }
+  return bet.paid;
+}
+
 app.get("/api/markets/:id/bet/:betId", async (req, res) => {
   const markets = await store.load();
   const m = store.find(markets, req.params.id);
   const bet = m?.bets.find((b) => b.id === req.params.betId);
   if (!bet) return res.status(404).json({ ok: false, error: "Apuesta no encontrada." });
-  if (!bet.paid && (await wallet.isPaid(bet.payment_hash))) {
-    bet.paid = true;
+  if (!bet.paid && (await confirmarPago(m, bet))) {
     await store.save(markets);
   }
   res.json({ ok: true, paid: bet.paid, pools: store.pools(m) });
@@ -183,7 +203,7 @@ async function resolveMarket(markets, m) {
 
   // confirmar pagos pendientes antes de repartir
   for (const b of m.bets) {
-    if (!b.paid && (await wallet.isPaid(b.payment_hash))) b.paid = true;
+    if (!b.paid) await confirmarPago(m, b);
   }
 
   let verdict = await resolveWithAI(m);

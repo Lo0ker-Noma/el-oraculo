@@ -31,8 +31,8 @@ if (!NWC_URL) {
   process.exit(1);
 }
 
-const { nwc } = await import("@getalby/sdk");
-const client = new nwc.NWCClient({ nostrWalletConnectUrl: NWC_URL });
+const { NWCClient } = await import("@getalby/sdk");
+const client = new NWCClient({ nostrWalletConnectUrl: NWC_URL });
 
 try {
   // 1) saldo
