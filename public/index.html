@@ -59,11 +59,20 @@
     </div>
 
     <div class="create-row">
-      <label class="stepper"><span class="ico">🗓</span> Cierran las apuestas
-        <input id="closesAt" type="datetime-local"></label>
-      <label class="stepper"><span class="ico">⚖️</span> El oráculo resuelve
-        <input id="resolvesAt" type="datetime-local"></label>
+      <div class="stepper picker" data-picker="closesAt"><span class="ico">🗓</span> Cierran las apuestas
+        <button type="button" class="picker-trigger" id="closesAt_btn" aria-haspopup="dialog"><span class="picker-lbl" id="closesAt_lbl">—</span></button>
+        <input id="closesAt" type="hidden"></div>
+      <div class="stepper picker" data-picker="resolvesAt"><span class="ico">⚖️</span> El oráculo resuelve
+        <button type="button" class="picker-trigger" id="resolvesAt_btn" aria-haspopup="dialog"><span class="picker-lbl" id="resolvesAt_lbl">—</span></button>
+        <input id="resolvesAt" type="hidden"></div>
       <button id="btnCreate" class="glass-btn primary">✦ Crear apuesta</button>
+    </div>
+    <div class="create-stake">
+      <span class="ico">🎲</span> Tu apuesta inicial <span class="muted">(opcional)</span>
+      <button type="button" class="glass-btn sm" id="cSi" data-cstake="si">SÍ</button>
+      <button type="button" class="glass-btn sm" id="cNo" data-cstake="no">NO</button>
+      <input type="number" id="cSats" min="10" max="10000000" value="210" title="sats a apostar"> <span class="muted">sats</span>
+      <input type="text" id="cLn" maxlength="253" placeholder="tu-lightning@address (para cobrar si ganas)">
     </div>
     <p class="muted atajos">Atajos:
       <button class="linkbtn" data-preset="15">15 min</button> ·

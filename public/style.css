@@ -130,12 +130,45 @@ h2 { font-size: 1.2rem; display: flex; align-items: center; gap: 10px; margin-bo
 .probBar div { height: 100%; border-radius: 99px; transition: width .5s ease; }
 .atajos { margin: 8px 0 0; font-size: .82rem; }
 .atajos .linkbtn { font-size: .82rem; }
-input[type=datetime-local], .stepper input[type=datetime-local] {
-  font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6);
-  border: 1px solid var(--stroke); border-radius: 12px; padding: 9px 11px; outline: none;
-  width: auto; min-width: 215px;
+/* --- calendario propio (date picker inequívoco) --- */
+.stepper.picker { position: relative; }
+.picker-trigger {
+  font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6); cursor: pointer;
+  border: 1px solid var(--stroke); border-radius: 12px; padding: 9px 13px; outline: none;
+  min-width: 215px; text-align: left; transition: border-color .15s, box-shadow .15s;
 }
-input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
+.picker-trigger::before { content: "📅 "; opacity: .7; }
+.picker-trigger:hover, .picker-trigger:focus { border-color: rgba(169, 112, 255, 0.6); box-shadow: 0 0 0 3px rgba(169, 112, 255, 0.12); }
+.cal-pop {
+  position: absolute; z-index: 100; top: calc(100% + 8px); left: 0; width: 262px;
+  background: #141024; border: 1px solid rgba(169, 112, 255, 0.3); border-radius: 16px;
+  padding: 14px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+}
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.cal-head b { text-transform: capitalize; font-size: .95rem; color: var(--text); }
+.cal-nav { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--stroke); color: var(--text);
+  width: 30px; height: 30px; border-radius: 9px; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+.cal-nav:hover { background: rgba(169, 112, 255, 0.18); }
+.cal-dows, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-dows span { text-align: center; font-size: .68rem; color: var(--muted); padding: 2px 0; }
+.cal-d { background: none; border: 1px solid transparent; color: var(--text); border-radius: 8px;
+  height: 32px; cursor: pointer; font: inherit; font-size: .85rem; }
+.cal-d.empty { visibility: hidden; cursor: default; }
+.cal-d:not(.empty):hover { background: rgba(169, 112, 255, 0.18); }
+.cal-d.hoy { border-color: rgba(169, 112, 255, 0.45); }
+.cal-d.sel { background: linear-gradient(135deg, var(--violet), var(--violet2)); color: #fff; font-weight: 700; }
+.cal-time { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--stroke); font-size: .85rem; color: var(--muted); }
+.cal-pop .cal-hora { font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6);
+  border: 1px solid var(--stroke); border-radius: 9px; padding: 7px 10px; outline: none;
+  width: auto; min-width: 96px; text-align: left; }
+.cal-pop .cal-hora:focus { border-color: rgba(169, 112, 255, 0.6); }
+.cal-pop .cal-hora::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+.cal-save { width: 100%; margin-top: 12px; padding: 10px; border: 0; border-radius: 11px; cursor: pointer;
+  font: inherit; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--violet), var(--violet2));
+  box-shadow: 0 6px 18px rgba(124, 77, 255, 0.35); transition: transform .12s, box-shadow .12s; }
+.cal-save:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(124, 77, 255, 0.45); }
+.cal-save:active { transform: translateY(0); }
 
 /* acceso (QR para la sala) */
 .accesoRow { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
@@ -205,6 +238,19 @@ input[type=datetime-local]:focus { border-color: rgba(169, 112, 255, 0.6); }
 .betRow input[type=number] { width: 110px; }
 .betRow input[type=text] { flex: 1; min-width: 190px; }
 .betRow input:focus { border-color: rgba(169, 112, 255, 0.6); }
+.retorno { margin-top: 10px; font-size: .9rem; color: var(--text); }
+.retorno b { color: var(--gold); }
+
+/* apuesta inicial al crear */
+.create-stake { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: .9rem; }
+.create-stake .ico { opacity: .8; }
+.create-stake input[type=number] { width: 96px; font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6);
+  border: 1px solid var(--stroke); border-radius: 12px; padding: 9px 11px; outline: none; text-align: center; }
+.create-stake input[type=text] { flex: 1; min-width: 190px; font: inherit; color: var(--text); background: rgba(10, 8, 18, 0.6);
+  border: 1px solid var(--stroke); border-radius: 12px; padding: 9px 13px; outline: none; }
+.create-stake input:focus { border-color: rgba(169, 112, 255, 0.6); }
+#cSi.selSi { background: linear-gradient(135deg, #2fae6a, var(--green)); border: 0; color: #06180c; }
+#cNo.selNo { background: linear-gradient(135deg, var(--red), #ff8a94); border: 0; color: #220a0d; }
 
 .verdict { border-left: 3px solid var(--violet); padding: 12px 16px; background: rgba(169, 112, 255, 0.08); border-radius: 12px; margin-top: 12px; }
 .verdict .outcome { font-size: 1.2rem; font-weight: 800; }
