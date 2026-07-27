@@ -16,9 +16,10 @@
   </a>
   <div class="navlinks">
     <a href="#crear" class="active">✦ Nueva apuesta</a>
-    <a href="#apuestas">☰ Mis apuestas</a>
+    <a href="#apuestas">☰ Apuestas</a>
     <a href="#como">? Cómo funciona</a>
     <a href="#acceso">📱 Acceso</a>
+    <a href="#admin">🔐 Admin</a>
   </div>
   <button id="nostrBtn" class="glass-btn nostr">⚡ Conéctate con Nostr</button>
 </nav>
@@ -132,7 +133,26 @@
   </section>
 
   <section id="apuestas">
-    <div id="markets"></div>
+    <h2 class="secTitle"><span class="spark">✦</span> Apuestas abiertas</h2>
+    <div id="marketsOpen"></div>
+    <h2 class="secTitle closedTitle"><span class="spark">✦</span> Cerradas y resueltas</h2>
+    <div id="marketsClosed"></div>
+  </section>
+
+  <section id="admin" class="card glass">
+    <h2><span class="spark">🔐</span> Admin</h2>
+    <div id="adminLocked">
+      <p class="muted">Zona de gestión. Aquí puedes resolver apuestas al momento y eliminar las de prueba.</p>
+      <div class="adminRow">
+        <input type="password" id="adminPass" placeholder="Contraseña" maxlength="40" autocomplete="off">
+        <button id="adminUnlock" class="glass-btn primary">Entrar</button>
+      </div>
+      <p id="adminMsg" class="error"></p>
+    </div>
+    <div id="adminPanel" class="hidden">
+      <p class="muted">🟢 Modo administrador activo. <button id="adminLock" class="linkbtn">salir</button></p>
+      <div id="adminMarkets"></div>
+    </div>
   </section>
 </main>
 
@@ -146,6 +166,14 @@
     <p class="invoice" id="payInvoice"></p>
     <p id="payStatus" class="muted">Esperando pago…</p>
     <button id="payClose" class="glass-btn sec">Cerrar</button>
+  </div>
+</div>
+
+<div id="detailModal" class="modal hidden">
+  <div class="card glass modalCard detailCard">
+    <h2 id="detailTitle">Detalle de la apuesta</h2>
+    <div id="detailBody"></div>
+    <button id="detailClose" class="glass-btn sec">Cerrar</button>
   </div>
 </div>
 

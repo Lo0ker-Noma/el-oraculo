@@ -125,60 +125,73 @@ function saveDrafts() {
   document.querySelectorAll('input[id^="ln-"]').forEach((el) => { (drafts[el.id.slice(3)] ||= {}).ln = el.value; recordarLn(el.value); });
 }
 
+function marketCard(m) {
+  const p = m.pools;
+  const siPct = p.total ? Math.round((p.si / p.total) * 100) : 50;
+  const open = m.status === "open" && Date.now() / 1000 < m.closes_at;
+  const d = drafts[m.id] || {};
+
+  let body = "";
+  if (m.status === "resolved" && m.verdict) {
+    const v = m.verdict;
+    const fuentes = (v.fuentes || []).filter(httpOnly);
+    body = `<div class="verdict">
+      <div class="outcome ${esc(v.outcome)}">${v.outcome === "si" ? "✅ SÍ" : v.outcome === "no" ? "❌ NO" : "⚪ INDETERMINADO (devolución)"}
+        <span class="muted" style="font-weight:400;font-size:.8rem"> · confianza ${esc(v.confianza)}${v.ai ? ` · 🤖 investigado por ${esc(v.provider || "IA")}` : ""}</span></div>
+      <p>${esc(v.razonamiento)}</p>
+      ${fuentes.length ? `<div class="sources">Fuentes: ${fuentes.map((f) => `<a href="${esc(f)}" target="_blank" rel="noopener noreferrer">${esc(shortUrl(f))}</a>`).join(" · ")}</div>` : ""}
+      ${m.bets.some((b) => b.payout_sats > 0) ? `<div class="payouts">💸 Reparto: ${m.bets.filter((b) => b.payout_sats > 0).map((b) => `${b.npub ? esc(shortNpub(b.npub)) + " " : ""}${fmt(b.payout_sats)} sats (${esc(b.payout_status || "pendiente")})`).join(" · ")}</div>` : ""}
+    </div>`;
+  } else if (m.status === "resolving") {
+    body = `<p class="resolving">🔮 El oráculo está investigando… (busca en la web, delibera y repartirá el bote)</p>`;
+  } else if (open) {
+    const sel = selections[m.id];
+    body = `<div class="betBox">
+      <div class="betLabel">Tu apuesta:</div>
+      <div class="side">
+        <button class="glass-btn ${sel === "si" ? "selSi" : ""}" data-action="pick" data-id="${m.id}" data-side="si">SÍ</button>
+        <button class="glass-btn ${sel === "no" ? "selNo" : ""}" data-action="pick" data-id="${m.id}" data-side="no">NO</button>
+      </div>
+      <div class="betRow">
+        <input type="number" id="sats-${m.id}" value="${esc(d.sats ?? 210)}" min="10" max="10000000" title="sats a apostar"> <span class="muted">sats</span>
+        <input type="text" id="ln-${m.id}" maxlength="253" value="${esc(d.ln ?? lnGuardada())}" placeholder="tu-lightning@address (para cobrar si ganas)" ${DEMO ? "" : "required"}>
+        <button class="glass-btn gold" data-action="bet" data-id="${m.id}">Apostar ⚡</button>
+      </div>
+      <div class="retorno" id="ret-${m.id}">${retornoTexto(m)}</div>
+    </div>
+    <p class="error" id="err-${m.id}"></p>`;
+  } else {
+    body = `<p class="muted">Apuestas cerradas. El oráculo resolverá en ${left(m.resolves_at)}.</p>`;
+  }
+
+  const estado = m.status === "resolved" ? "Resuelta" : m.status === "resolving" ? "Resolviendo…"
+    : open ? `Cierra en ${left(m.closes_at)} · resuelve en ${left(m.resolves_at)}` : "Cerrada, esperando resolución";
+  return `<div class="card glass market">
+    <div class="q">${esc(m.question)}</div>
+    ${m.description ? `<div class="muted">${esc(m.description)}</div>` : ""}
+    <div class="meta">${estado} · bote <b>${fmt(p.total)} sats</b> · ${p.apostadores} apuestas</div>
+    <div class="poolbar"><div class="si" style="width:${siPct}%"></div><div class="no" style="width:${100 - siPct}%"></div></div>
+    <div class="pools"><span class="green">SÍ · ${fmt(p.si)} sats</span><span class="red">NO · ${fmt(p.no)} sats</span></div>
+    ${body}
+    <div class="cardActions"><button class="linkbtn" data-action="detalle" data-id="${m.id}">🔍 Ver detalle · quién ha apostado</button></div>
+  </div>`;
+}
+
 function render(markets) {
   saveDrafts();
   $("modeBadge").textContent = DEMO
     ? "🧪 MODO DEMO — pagos simulados (configura NWC_URL para sats reales)"
     : "⚡ Wallet real conectada (NWC)";
 
-  $("markets").innerHTML = markets.map((m) => {
-    const p = m.pools;
-    const siPct = p.total ? Math.round((p.si / p.total) * 100) : 50;
-    const open = m.status === "open" && Date.now() / 1000 < m.closes_at;
-    const d = drafts[m.id] || {};
-
-    let body = "";
-    if (m.status === "resolved" && m.verdict) {
-      const v = m.verdict;
-      const fuentes = (v.fuentes || []).filter(httpOnly);
-      body = `<div class="verdict">
-        <div class="outcome ${esc(v.outcome)}">${v.outcome === "si" ? "✅ SÍ" : v.outcome === "no" ? "❌ NO" : "⚪ INDETERMINADO (devolución)"}
-          <span class="muted" style="font-weight:400;font-size:.8rem"> · confianza ${esc(v.confianza)}${v.ai ? ` · 🤖 investigado en la web (${esc(v.provider || "IA")})` : ""}</span></div>
-        <p>${esc(v.razonamiento)}</p>
-        ${fuentes.length ? `<div class="sources">Fuentes: ${fuentes.map((f) => `<a href="${esc(f)}" target="_blank" rel="noopener noreferrer">${esc(shortUrl(f))}</a>`).join(" · ")}</div>` : ""}
-        ${m.bets.some((b) => b.payout_sats > 0) ? `<div class="payouts">💸 Reparto: ${m.bets.filter((b) => b.payout_sats > 0).map((b) => `${b.npub ? esc(shortNpub(b.npub)) + " " : ""}${fmt(b.payout_sats)} sats (${esc(b.payout_status || "pendiente")})`).join(" · ")}</div>` : ""}
-      </div>`;
-    } else if (m.status === "resolving") {
-      body = `<p class="resolving">🔮 El oráculo está investigando… (busca en la web, delibera y repartirá el bote)</p>`;
-    } else if (open) {
-      const sel = selections[m.id];
-      body = `<div class="betBox">
-        <div class="betLabel">Tu apuesta:</div>
-        <div class="side">
-          <button class="glass-btn ${sel === "si" ? "selSi" : ""}" data-action="pick" data-id="${m.id}" data-side="si">SÍ</button>
-          <button class="glass-btn ${sel === "no" ? "selNo" : ""}" data-action="pick" data-id="${m.id}" data-side="no">NO</button>
-        </div>
-        <div class="betRow">
-          <input type="number" id="sats-${m.id}" value="${esc(d.sats ?? 210)}" min="10" max="10000000" title="sats a apostar"> <span class="muted">sats</span>
-          <input type="text" id="ln-${m.id}" maxlength="253" value="${esc(d.ln ?? lnGuardada())}" placeholder="tu-lightning@address (para cobrar si ganas)" ${DEMO ? "" : "required"}>
-          <button class="glass-btn gold" data-action="bet" data-id="${m.id}">Apostar ⚡</button>
-        </div>
-        <div class="retorno" id="ret-${m.id}">${retornoTexto(m)}</div>
-      </div>
-      <p class="error" id="err-${m.id}"></p>`;
-    } else {
-      body = `<p class="muted">Apuestas cerradas. El oráculo resolverá en ${left(m.resolves_at)}. <button class="glass-btn sm" data-action="resolve" data-id="${m.id}">🔮 Resolver ahora</button></p>`;
-    }
-
-    return `<div class="card glass market">
-      <div class="q">${esc(m.question)}</div>
-      ${m.description ? `<div class="muted">${esc(m.description)}</div>` : ""}
-      <div class="meta">${m.status === "resolved" ? "Resuelta" : m.status === "resolving" ? "Resolviendo…" : open ? `Cierra en ${left(m.closes_at)} · resuelve en ${left(m.resolves_at)}` : "Cerrada"} · bote <b>${fmt(p.total)} sats</b> · ${p.apostadores} apuestas${open ? ` · <button class="linkbtn" data-action="resolve" data-id="${m.id}">🔮 resolver ya</button>` : ""}</div>
-      <div class="poolbar"><div class="si" style="width:${siPct}%"></div><div class="no" style="width:${100 - siPct}%"></div></div>
-      <div class="pools"><span class="green">SÍ · ${fmt(p.si)} sats</span><span class="red">NO · ${fmt(p.no)} sats</span></div>
-      ${body}
-    </div>`;
-  }).join("") || `<div class="card glass muted">No hay apuestas todavía. Crea la primera 👆</div>`;
+  const abiertas = markets.filter((m) => m.status === "open" || m.status === "resolving");
+  const cerradas = markets.filter((m) => m.status === "resolved");
+  $("marketsOpen").innerHTML = abiertas.map(marketCard).join("") ||
+    `<div class="card glass muted">No hay apuestas abiertas. Crea la primera 👆</div>`;
+  $("marketsClosed").innerHTML = cerradas.map(marketCard).join("") ||
+    `<div class="card glass muted">Todavía no hay apuestas resueltas.</div>`;
+  const ct = document.querySelector(".closedTitle");
+  if (ct) ct.style.display = cerradas.length ? "" : "none";
+  if (adminUnlocked) renderAdmin(markets);
 }
 
 // --- Acciones (delegacion de eventos, sin handlers inline) -----------------
@@ -226,6 +239,97 @@ function closePay() { $("payModal").classList.add("hidden"); if (payPoll) clearI
 
 async function resolveNow(id) {
   try { await api(`/api/markets/${id}/resolve`, { method: "POST" }); } catch (e) { console.warn(e.message); }
+  refresh(true);
+}
+
+// --- Detalle de una apuesta (quién ha apostado) ----------------------------
+
+function detalle(id) {
+  const m = lastMarkets.find((x) => x.id === id);
+  if (!m) return;
+  const p = m.pools;
+  const bets = m.bets || [];
+  const filas = bets.length
+    ? bets.map((b) => `<div class="betDetailRow">
+        <span class="pill ${b.side}">${b.side === "si" ? "SÍ" : "NO"}</span>
+        <span class="bdSats">${fmt(b.sats)} sats</span>
+        <span class="bdWho">${b.npub ? "🟣 " + esc(shortNpub(b.npub)) : "<span class=\"muted\">anónimo</span>"}</span>
+        ${b.payout_sats > 0 ? `<span class="green">+${fmt(b.payout_sats)} sats</span>` : ""}
+      </div>`).join("")
+    : `<p class="muted">Aún no hay apuestas pagadas en el bote.</p>`;
+  $("detailTitle").textContent = m.question;
+  $("detailBody").innerHTML =
+    `<div class="detailMeta">Bote <b>${fmt(p.total)} sats</b> · ${p.apostadores} apuesta(s) pagadas · <span class="green">SÍ ${fmt(p.si)}</span> / <span class="red">NO ${fmt(p.no)}</span></div>
+     <div class="betDetailList">${filas}</div>
+     <p class="muted bdNote">🟣 = apostó identificándose con Nostr. El resto son anónimos (apostar no requiere login).</p>`;
+  $("detailModal").classList.remove("hidden");
+}
+function closeDetail() { $("detailModal").classList.add("hidden"); }
+
+// --- Admin (contraseña) -----------------------------------------------------
+
+let adminUnlocked = false;
+let adminPass = "";
+
+async function adminLogin() {
+  const pass = $("adminPass").value;
+  $("adminMsg").textContent = "";
+  try {
+    const j = await api("/api/admin/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin: pass }),
+    });
+    if (!j.ok) throw new Error("Contraseña incorrecta.");
+    adminUnlocked = true; adminPass = pass;
+    try { sessionStorage.setItem("oraculo_admin", pass); } catch {}
+    $("adminLocked").classList.add("hidden");
+    $("adminPanel").classList.remove("hidden");
+    renderAdmin(lastMarkets);
+  } catch (e) {
+    $("adminMsg").textContent = e.message;
+  }
+}
+
+function adminLogout() {
+  adminUnlocked = false; adminPass = "";
+  try { sessionStorage.removeItem("oraculo_admin"); } catch {}
+  $("adminPanel").classList.add("hidden");
+  $("adminLocked").classList.remove("hidden");
+  $("adminPass").value = "";
+}
+
+function renderAdmin(markets) {
+  $("adminMarkets").innerHTML = markets.map((m) => `
+    <div class="adminItem">
+      <div class="adminQ">${esc(m.question)}<br><span class="muted">${m.status} · bote ${fmt(m.pools.total)} sats · ${m.pools.apostadores} apuestas</span></div>
+      <div class="adminBtns">
+        ${m.status === "open" ? `<button class="glass-btn sm" data-action="admresolve" data-id="${m.id}">🔮 Resolver ya</button>` : ""}
+        <button class="glass-btn sm danger" data-action="admdelete" data-id="${m.id}">🗑 Borrar</button>
+      </div>
+    </div>`).join("") || `<p class="muted">No hay apuestas.</p>`;
+}
+
+async function adminResolve(id) {
+  const el = document.querySelector(`[data-action="admresolve"][data-id="${id}"]`);
+  if (el) { el.disabled = true; el.textContent = "🔮 Resolviendo…"; }
+  try {
+    await api(`/api/markets/${id}/resolve`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin: adminPass }),
+    });
+  } catch (e) { alert("No se pudo resolver: " + e.message); }
+  refresh(true);
+}
+
+async function adminDelete(id) {
+  const m = lastMarkets.find((x) => x.id === id);
+  if (!confirm(`¿Borrar la apuesta "${m ? m.question : id}"? No se puede deshacer.`)) return;
+  try {
+    await api(`/api/admin/markets/${id}/delete`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ admin: adminPass }),
+    });
+  } catch (e) { alert("No se pudo borrar: " + e.message); }
   refresh(true);
 }
 
@@ -438,7 +542,13 @@ $("chatInput").addEventListener("keydown", (e) => {
 $("btnCreate").addEventListener("click", createMarket);
 if ($("cLn")) $("cLn").value = lnGuardada(); // autorrellenar Lightning address recordada
 $("payClose").addEventListener("click", closePay);
+$("detailClose").addEventListener("click", closeDetail);
 $("nostrBtn").addEventListener("click", () => { if (auth) { auth = null; renderAuth(); } else nostrLogin(); });
+$("adminUnlock").addEventListener("click", adminLogin);
+$("adminLock").addEventListener("click", adminLogout);
+$("adminPass").addEventListener("keydown", (e) => { if (e.key === "Enter") adminLogin(); });
+// recuperar sesión de admin si estaba abierta
+try { const ap = sessionStorage.getItem("oraculo_admin"); if (ap) { $("adminPass").value = ap; adminLogin(); } } catch {}
 
 // contadores de caracteres
 [["q", "qCount", 160], ["desc", "descCount", 280]].forEach(([i, c, max]) => {
@@ -460,6 +570,9 @@ document.addEventListener("click", (e) => {
     if (action === "pick") pick(id, side);
     else if (action === "bet") bet(id);
     else if (action === "resolve") resolveNow(id);
+    else if (action === "detalle") detalle(id);
+    else if (action === "admresolve") adminResolve(id);
+    else if (action === "admdelete") adminDelete(id);
     return;
   }
   // botones de la apuesta inicial (al crear)

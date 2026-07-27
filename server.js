@@ -22,6 +22,7 @@ import { securityHeaders, rateLimit, safeLnAddress, sanitizeUrls, clean } from "
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 5220;
 const EN_VERCEL = Boolean(process.env.VERCEL);
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "1234";
 
 const app = express();
 app.disable("x-powered-by");
@@ -241,8 +242,11 @@ app.post("/api/markets/:id/resolve", rateLimit(20, 10 * 60_000), async (req, res
   if (!m) return res.status(404).json({ ok: false, error: "No existe." });
   if (m.status !== "open") return res.status(400).json({ ok: false, error: `Estado: ${m.status}` });
   const vencida = Date.now() / 1000 >= m.resolves_at;
-  if (!vencida && !wallet.DEMO && Date.now() / 1000 < m.closes_at) {
-    return res.status(403).json({ ok: false, error: "No se puede forzar la resolucion mientras las apuestas siguen abiertas." });
+  const esAdmin = req.body?.admin === ADMIN_PASSWORD;
+  // La resolucion automatica (cuando vence) la dispara el front y es libre.
+  // Forzarla antes de tiempo ("resolver ya") es solo para el admin.
+  if (!vencida && !esAdmin) {
+    return res.status(403).json({ ok: false, error: "Solo el admin puede forzar la resolucion antes de tiempo." });
   }
   try {
     await resolveMarket(markets, m);
@@ -251,6 +255,22 @@ app.post("/api/markets/:id/resolve", rateLimit(20, 10 * 60_000), async (req, res
     console.error(e);
     res.status(500).json({ ok: false, error: "Fallo al resolver." });
   }
+});
+
+// --- Admin: borrar una apuesta (para limpiar pruebas) ----------------------
+app.post("/api/admin/markets/:id/delete", rateLimit(30, 10 * 60_000), async (req, res) => {
+  if (req.body?.admin !== ADMIN_PASSWORD) return res.status(401).json({ ok: false, error: "Contraseña de admin incorrecta." });
+  const markets = await store.load();
+  const i = markets.findIndex((m) => m.id === req.params.id);
+  if (i < 0) return res.status(404).json({ ok: false, error: "No existe." });
+  const [borrada] = markets.splice(i, 1);
+  await store.save(markets);
+  res.json({ ok: true, deleted: borrada.id });
+});
+
+// Comprueba la contraseña de admin (para desbloquear el panel).
+app.post("/api/admin/login", rateLimit(20, 10 * 60_000), (req, res) => {
+  res.json({ ok: req.body?.admin === ADMIN_PASSWORD });
 });
 
 // En local mantenemos el vigilante; en Vercel lo dispara el front.
