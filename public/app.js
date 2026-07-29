@@ -24,6 +24,70 @@ const left = (ts) => {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const shortUrl = (u) => u.replace(/^https?:\/\//, "").slice(0, 40);
 const shortNpub = (n) => (n ? n.slice(0, 9) + "…" + n.slice(-4) : "");
+
+// --- Perfiles Nostr (kind 0): resolver el seudónimo desde relays -------------
+const PROFILE_RELAYS = ["wss://relay.primal.net", "wss://relay.damus.io", "wss://nos.lol", "wss://relay.nostr.band"];
+const profileCache = {}; // hexpubkey -> nombre (string) | null (en curso)
+
+// Decodifica un npub bech32 a pubkey hex (sin dependencias).
+function npubToHex(npub) {
+  try {
+    const CH = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+    if (!npub || !npub.startsWith("npub1")) return null;
+    const data = npub.slice(5);
+    const vals = [];
+    for (const c of data) { const i = CH.indexOf(c); if (i < 0) return null; vals.push(i); }
+    const words = vals.slice(0, -6); // quita el checksum (6 chars)
+    let acc = 0, bits = 0; const bytes = [];
+    for (const w of words) {
+      acc = (acc << 5) | w; bits += 5;
+      if (bits >= 8) { bits -= 8; bytes.push((acc >> bits) & 0xff); }
+    }
+    if (bytes.length !== 32) return null;
+    return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch { return null; }
+}
+
+// Nombre a mostrar: si ya tenemos el perfil, el seudónimo; si no, dispara la
+// carga en segundo plano y de momento devuelve el npub corto.
+function displayName(npub, pubkeyHex) {
+  const hex = pubkeyHex || (npub ? npubToHex(npub) : null);
+  if (hex && typeof profileCache[hex] === "string") return profileCache[hex];
+  if (hex && profileCache[hex] === undefined) resolveProfile(hex);
+  return shortNpub(npub);
+}
+
+function resolveProfile(hex) {
+  if (!hex || profileCache[hex] !== undefined) return;
+  profileCache[hex] = null; // marca "en curso"
+  let resuelto = false;
+  for (const url of PROFILE_RELAYS) {
+    let ws;
+    try { ws = new WebSocket(url); } catch { continue; }
+    const id = "p" + Math.random().toString(36).slice(2, 8);
+    const cerrar = () => { try { ws.close(); } catch {} };
+    ws.onopen = () => { try { ws.send(JSON.stringify(["REQ", id, { authors: [hex], kinds: [0], limit: 1 }])); } catch {} };
+    ws.onmessage = (m) => {
+      let d; try { d = JSON.parse(m.data); } catch { return; }
+      if (d[0] === "EVENT" && d[2]?.kind === 0) {
+        try {
+          const meta = JSON.parse(d[2].content || "{}");
+          const nm = String(meta.display_name || meta.displayName || meta.name || "").trim();
+          if (nm && !resuelto) { resuelto = true; profileCache[hex] = nm; repintarNombres(); }
+        } catch {}
+        cerrar();
+      } else if (d[0] === "EOSE") { cerrar(); }
+    };
+    ws.onerror = cerrar;
+    setTimeout(cerrar, 6000);
+  }
+}
+
+// Repinta las zonas donde aparecen seudónimos cuando llega un perfil.
+function repintarNombres() {
+  try { renderAuth(); } catch {}
+  try { if (lastMarkets.length) render(lastMarkets); } catch {}
+}
 const httpOnly = (u) => /^https?:\/\//i.test(u);
 
 // Lightning address recordada en el navegador: se autorrellena en todas las
@@ -83,7 +147,7 @@ async function nostrLogin() {
 
 function renderAuth() {
   const b = $("nostrBtn");
-  if (auth) { b.textContent = "🟣 " + shortNpub(auth.npub); b.title = "Conectado — click para desconectar"; }
+  if (auth) { b.textContent = "🟣 " + displayName(auth.npub, auth.pubkey); b.title = "Conectado — click para desconectar"; }
   else { b.textContent = "⚡ Conéctate con Nostr"; b.title = ""; }
 }
 
@@ -140,7 +204,7 @@ function marketCard(m) {
         <span class="muted" style="font-weight:400;font-size:.8rem"> · confianza ${esc(v.confianza)}${v.ai ? ` · 🤖 investigado por ${esc(v.provider || "IA")}` : ""}</span></div>
       <p>${esc(v.razonamiento)}</p>
       ${fuentes.length ? `<div class="sources">Fuentes: ${fuentes.map((f) => `<a href="${esc(f)}" target="_blank" rel="noopener noreferrer">${esc(shortUrl(f))}</a>`).join(" · ")}</div>` : ""}
-      ${m.bets.some((b) => b.payout_sats > 0) ? `<div class="payouts">💸 Reparto: ${m.bets.filter((b) => b.payout_sats > 0).map((b) => `${b.npub ? esc(shortNpub(b.npub)) + " " : ""}${fmt(b.payout_sats)} sats (${esc(b.payout_status || "pendiente")})`).join(" · ")}</div>` : ""}
+      ${m.bets.some((b) => b.payout_sats > 0) ? `<div class="payouts">💸 Reparto: ${m.bets.filter((b) => b.payout_sats > 0).map((b) => `${b.npub ? esc(displayName(b.npub)) + " " : ""}${fmt(b.payout_sats)} sats (${esc(b.payout_status || "pendiente")})`).join(" · ")}</div>` : ""}
     </div>`;
   } else if (m.status === "resolving") {
     body = `<p class="resolving">🔮 El oráculo está investigando… (busca en la web, delibera y repartirá el bote)</p>`;
@@ -253,7 +317,7 @@ function detalle(id) {
     ? bets.map((b) => `<div class="betDetailRow">
         <span class="pill ${b.side}">${b.side === "si" ? "SÍ" : "NO"}</span>
         <span class="bdSats">${fmt(b.sats)} sats</span>
-        <span class="bdWho">${b.npub ? "🟣 " + esc(shortNpub(b.npub)) : "<span class=\"muted\">anónimo</span>"}</span>
+        <span class="bdWho">${b.npub ? "🟣 " + esc(displayName(b.npub)) : "<span class=\"muted\">anónimo</span>"}</span>
         ${b.payout_sats > 0 ? `<span class="green">+${fmt(b.payout_sats)} sats</span>` : ""}
       </div>`).join("")
     : `<p class="muted">Aún no hay apuestas pagadas en el bote.</p>`;
