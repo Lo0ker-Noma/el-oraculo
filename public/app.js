@@ -26,7 +26,7 @@ const shortUrl = (u) => u.replace(/^https?:\/\//, "").slice(0, 40);
 const shortNpub = (n) => (n ? n.slice(0, 9) + "…" + n.slice(-4) : "");
 
 // --- Perfiles Nostr (kind 0): resolver el seudónimo desde relays -------------
-const PROFILE_RELAYS = ["wss://relay.primal.net", "wss://relay.damus.io", "wss://nos.lol", "wss://relay.nostr.band"];
+const PROFILE_RELAYS = ["wss://purplepag.es", "wss://nos.lol", "wss://relay.primal.net", "wss://relay.nostr.band", "wss://relay.damus.io"];
 const profileCache = {}; // hexpubkey -> nombre (string) | null (en curso)
 
 // Decodifica un npub bech32 a pubkey hex (sin dependencias).
