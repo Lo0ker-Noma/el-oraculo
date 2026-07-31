@@ -87,6 +87,8 @@ function resolveProfile(hex) {
 function repintarNombres() {
   try { renderAuth(); } catch {}
   try { if (lastMarkets.length) render(lastMarkets); } catch {}
+  // el modal de detalle se pinta una sola vez: hay que rehacerlo si sigue abierto
+  try { if (detalleAbierto) detalle(detalleAbierto); } catch {}
 }
 const httpOnly = (u) => /^https?:\/\//i.test(u);
 
@@ -308,9 +310,16 @@ async function resolveNow(id) {
 
 // --- Detalle de una apuesta (quién ha apostado) ----------------------------
 
+let detalleAbierto = null; // id del mercado mostrado en el modal de detalle
+
+// Los nombres de Nostr llegan de forma asincrona: mientras el modal este
+// abierto, lo repintamos periodicamente para que aparezcan sin cerrar y abrir.
+setInterval(() => { if (detalleAbierto) { try { detalle(detalleAbierto); } catch {} } }, 1500);
+
 function detalle(id) {
   const m = lastMarkets.find((x) => x.id === id);
   if (!m) return;
+  detalleAbierto = id;
   const p = m.pools;
   const bets = m.bets || [];
   const filas = bets.length
@@ -328,7 +337,7 @@ function detalle(id) {
      <p class="muted bdNote">🟣 = apostó identificándose con Nostr. El resto son anónimos (apostar no requiere login).</p>`;
   $("detailModal").classList.remove("hidden");
 }
-function closeDetail() { $("detailModal").classList.add("hidden"); }
+function closeDetail() { $("detailModal").classList.add("hidden"); detalleAbierto = null; }
 
 // --- Admin (contraseña) -----------------------------------------------------
 
