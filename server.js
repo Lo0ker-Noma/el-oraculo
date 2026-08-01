@@ -71,6 +71,27 @@ app.get("/api/acceso", async (req, res) => {
   }
 });
 
+// --- Salud de los pagos (diagnostico rapido antes de una demo) -------------
+
+app.get("/api/salud", async (_req, res) => {
+  const t0 = Date.now();
+  let invoice = null, error = null;
+  try {
+    const r = await wallet.createInvoice(21, "El Oraculo - prueba de salud");
+    invoice = { via: r.via, ok: Boolean(r.invoice) };
+  } catch (e) {
+    error = e.message;
+  }
+  res.json({
+    ok: Boolean(invoice),
+    pagos: wallet.estadoPagos(),
+    lightning_address: wallet.LN_ADDRESS || null,
+    factura_de_prueba: invoice,
+    error,
+    ms: Date.now() - t0,
+  });
+});
+
 // --- Mercados ---------------------------------------------------------------
 
 app.get("/api/markets", async (_req, res) => {
@@ -149,18 +170,19 @@ app.post("/api/markets/:id/bet", rateLimit(30, 10 * 60_000), async (req, res) =>
   }
   const pubkey = verifyToken(req.body?.token) || null; // identidad opcional verificada
   try {
-    const { invoice, payment_hash } = await wallet.createInvoice(sats, `El Oraculo · ${side.toUpperCase()} · ${m.question.slice(0, 60)}`);
+    const { invoice, payment_hash, via } = await wallet.createInvoice(sats, `El Oraculo · ${side.toUpperCase()} · ${m.question.slice(0, 60)}`);
     const bet = {
-      id: store.uid(), side, sats, lnaddress, pubkey, invoice, payment_hash,
+      id: store.uid(), side, sats, lnaddress, pubkey, invoice, payment_hash, via,
       invoiced_at: Math.floor(Date.now() / 1000),
       paid: false, paid_match: null, payout_sats: 0, payout_status: null,
     };
     m.bets.push(bet);
     await store.save(markets);
     const qr = await QRCode.toDataURL(invoice, { margin: 1, width: 280 });
-    res.json({ ok: true, bet_id: bet.id, invoice, qr, demo: wallet.DEMO });
+    res.json({ ok: true, bet_id: bet.id, invoice, qr, demo: wallet.DEMO, via: bet.via || null });
   } catch (e) {
-    res.status(500).json({ ok: false, error: `No pude crear la invoice: ${e.message}` });
+    console.error(`[bet] no se pudo crear la invoice: ${e.message}`);
+    res.status(503).json({ ok: false, error: `No pude generar la factura Lightning: ${e.message}` });
   }
 });
 
@@ -174,6 +196,13 @@ async function confirmarPago(m, bet) {
     if (await wallet.isPaid(bet.payment_hash)) bet.paid = true;
     return bet.paid;
   }
+  // 1) por hash, si la invoice la emitio la propia wallet y sabe reportarlo
+  if (bet.payment_hash && (await wallet.isPaid(bet.payment_hash))) {
+    bet.paid = true;
+    return true;
+  }
+  // 2) por importe + hora: sirve para wallets que no reportan por hash (Primal)
+  //    y para las invoices de rescate emitidas por LNURL (que no traen hash).
   const ingresos = await wallet.ingresosLiquidados();
   const usados = new Set(m.bets.filter((b) => b.paid && b.paid_match != null).map((b) => b.paid_match));
   const desde = (bet.invoiced_at || 0) - 30; // margen por desfase de reloj
@@ -266,6 +295,23 @@ app.post("/api/admin/markets/:id/delete", rateLimit(30, 10 * 60_000), async (req
   const [borrada] = markets.splice(i, 1);
   await store.save(markets);
   res.json({ ok: true, deleted: borrada.id });
+});
+
+// --- Admin: confirmar un pago a mano (contingencia de demo) ----------------
+// Red de seguridad: si la wallet no reporta un ingreso (relay caido, wallet que
+// no contesta), el admin puede dar por pagada una apuesta para que la demo
+// continue. Queda marcada como confirmada manualmente, no se disfraza.
+app.post("/api/admin/markets/:id/bets/:betId/confirm", rateLimit(60, 10 * 60_000), async (req, res) => {
+  if (req.body?.admin !== ADMIN_PASSWORD) return res.status(401).json({ ok: false, error: "Contraseña de admin incorrecta." });
+  const markets = await store.load();
+  const m = store.find(markets, req.params.id);
+  const bet = m?.bets.find((b) => b.id === req.params.betId);
+  if (!bet) return res.status(404).json({ ok: false, error: "Apuesta no encontrada." });
+  bet.paid = true;
+  bet.paid_manual = true;
+  await store.save(markets);
+  console.log(`[admin] pago confirmado a mano: ${bet.sats} sats en ${m.id}`);
+  res.json({ ok: true, pools: store.pools(m) });
 });
 
 // Comprueba la contraseña de admin (para desbloquear el panel).
