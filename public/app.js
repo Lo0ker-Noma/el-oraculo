@@ -278,14 +278,23 @@ async function apostar(id, side, sats, lnaddress, errEl) {
     $("payInvoice").textContent = j.invoice;
     $("payStatus").textContent = j.demo ? "🧪 Modo demo: el pago se confirma solo en unos segundos…" : "Escanea y paga la invoice con tu wallet ⚡";
     $("payModal").classList.remove("hidden");
-    payPoll = setInterval(async () => {
-      const st = await api(`/api/markets/${id}/bet/${j.bet_id}`);
-      if (st.paid) {
-        $("payStatus").textContent = "✅ ¡Pagado! Estás dentro del bote.";
-        clearInterval(payPoll);
-        setTimeout(() => { closePay(); refresh(true); }, 1200);
-      }
-    }, 1500);
+    // Sondeo rapido para que el pago se note casi al instante. Se evita
+    // solapar peticiones si alguna tarda mas que el intervalo.
+    let comprobando = false;
+    const mirarPago = async () => {
+      if (comprobando) return;
+      comprobando = true;
+      try {
+        const st = await api(`/api/markets/${id}/bet/${j.bet_id}`);
+        if (st.paid) {
+          clearInterval(payPoll);
+          $("payStatus").textContent = "✅ ¡Pagado! Estás dentro del bote.";
+          setTimeout(() => { closePay(); refresh(true); }, 900);
+        }
+      } catch {} finally { comprobando = false; }
+    };
+    payPoll = setInterval(mirarPago, 700);
+    mirarPago();
   } catch (e) {
     if (errEl) errEl.textContent = e.message;
     else $("createMsg").textContent = e.message;
