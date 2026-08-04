@@ -314,3 +314,9 @@ footer { text-align: center; color: var(--muted); font-size: .9rem; }
 .betDetailRow .bdSats { font-weight: 600; }
 .betDetailRow .bdWho { margin-left: auto; font-size: .85rem; }
 .bdNote { font-size: .78rem; margin-top: 12px; }
+
+/* criterio dinámico (resolución anticipada) */
+.anticipada-row { display: flex; align-items: center; gap: 9px; margin-top: 12px; cursor: pointer; font-size: .86rem; color: var(--muted); }
+.anticipada-row input { accent-color: var(--violet); width: 16px; height: 16px; cursor: pointer; }
+.anticipada-row b { color: var(--text); font-weight: 600; }
+.dyn { color: #c9a6ff; background: rgba(169,112,255,.12); border: 1px solid rgba(169,112,255,.3); border-radius: 999px; padding: 2px 9px; font-size: .72rem; white-space: nowrap; }

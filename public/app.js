@@ -166,6 +166,7 @@ async function createMarket() {
       body: JSON.stringify({
         question: $("q").value, description: $("desc").value,
         closes_at: $("closesAt").value, resolves_at: $("resolvesAt").value,
+        anticipada: $("anticipada")?.checked !== false,
       }),
     });
     $("q").value = $("desc").value = "";
@@ -235,7 +236,10 @@ function marketCard(m) {
   return `<div class="card glass market">
     <div class="q">${esc(m.question)}</div>
     ${m.description ? `<div class="muted">${esc(m.description)}</div>` : ""}
-    <div class="meta">${estado} · bote <b>${fmt(p.total)} sats</b> · ${p.apostadores} apuestas</div>
+    <div class="meta">${estado} · bote <b>${fmt(p.total)} sats</b> · ${p.apostadores} apuestas${
+      m.anticipada && m.status === "open"
+        ? ` · <span class="dyn" title="Se resolverá en cuanto el desenlace sea irreversible, sin esperar a la fecha">⚡ criterio dinámico</span>`
+        : ""}</div>
     <div class="poolbar"><div class="si" style="width:${siPct}%"></div><div class="no" style="width:${100 - siPct}%"></div></div>
     <div class="pools"><span class="green">SÍ · ${fmt(p.si)} sats</span><span class="red">NO · ${fmt(p.no)} sats</span></div>
     ${body}
@@ -683,6 +687,7 @@ document.addEventListener("input", (e) => {
 // --- Loop ------------------------------------------------------------------
 
 const disparadas = new Set(); // para no lanzar dos veces la misma resolución
+const revisadas = new Set();  // revisiones de criterio dinámico ya lanzadas
 
 async function refresh(force = false) {
   try {
@@ -692,6 +697,16 @@ async function refresh(force = false) {
     // en serverless no hay temporizador en el servidor: disparamos lo vencido
     for (const id of j.pendientes || []) {
       if (!disparadas.has(id)) { disparadas.add(id); resolveNow(id); }
+    }
+    // criterio dinámico: preguntar si alguna apuesta ya quedó decidida
+    for (const id of j.revisables || []) {
+      if (!revisadas.has(id)) {
+        revisadas.add(id);
+        api(`/api/markets/${id}/revisar`, { method: "POST" })
+          .then((r) => { if (r?.resuelta) refresh(true); })
+          .catch(() => {})
+          .finally(() => setTimeout(() => revisadas.delete(id), 60000));
+      }
     }
     const sig = DEMO + "|" + JSON.stringify(j.markets);
     if (!force && sig === lastSig) return; // nada cambió: no repintar (no borrar el formulario)

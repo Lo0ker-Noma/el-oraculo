@@ -14,7 +14,7 @@ import QRCode from "qrcode";
 import { nip19 } from "nostr-tools";
 import * as store from "./lib/store.js";
 import * as wallet from "./lib/wallet.js";
-import { resolveWithAI, demoVerdict, analizarProbabilidad, preguntarOraculo } from "./lib/oracle.js";
+import { resolveWithAI, demoVerdict, analizarProbabilidad, preguntarOraculo, comprobarDesenlaceAnticipado } from "./lib/oracle.js";
 import { publishVerdict } from "./lib/nostr.js";
 import { verifyNip98, issueToken, verifyToken } from "./lib/auth.js";
 import { securityHeaders, rateLimit, safeLnAddress, sanitizeUrls, clean } from "./lib/security.js";
@@ -43,6 +43,7 @@ const publicMarket = (m) => ({
   status: m.status,
   verdict: m.verdict,
   nostr: m.nostr,
+  anticipada: m.anticipada !== false,
   pools: store.pools(m),
   bets: m.bets.filter((b) => b.paid).map((b) => ({
     id: b.id, side: b.side, sats: b.sats,
@@ -101,6 +102,8 @@ app.get("/api/markets", async (_req, res) => {
     demo: wallet.DEMO,
     // apuestas que ya deberian resolverse: el front las dispara
     pendientes: markets.filter((m) => m.status === "open" && Date.now() / 1000 >= m.resolves_at).map((m) => m.id),
+    // apuestas con criterio dinamico que toca revisar (¿ya se decidio?)
+    revisables: markets.filter(tocaRevisar).map((m) => m.id),
     markets: markets.map(publicMarket),
   });
 });
@@ -125,7 +128,10 @@ app.post("/api/markets", rateLimit(8, 10 * 60_000), async (req, res) => {
   resolves = Math.max(resolves, closes); // nunca resolver antes de cerrar
 
   const markets = await store.load();
-  const m = store.nuevoMercado({ question, description, closes_at: closes, resolves_at: resolves });
+  const m = store.nuevoMercado({
+    question, description, closes_at: closes, resolves_at: resolves,
+    anticipada: req.body?.anticipada !== false, // criterio dinamico, activo por defecto
+  });
   markets.unshift(m);
   await store.save(markets);
   res.json({ ok: true, market: publicMarket(m) });
@@ -226,7 +232,7 @@ app.get("/api/markets/:id/bet/:betId", async (req, res) => {
 
 // --- Resolucion (el agente) -------------------------------------------------
 
-async function resolveMarket(markets, m) {
+async function resolveMarket(markets, m, veredictoPrevio = null) {
   m.status = "resolving";
   await store.save(markets);
   console.log(`[oraculo] resolviendo: "${m.question}"`);
@@ -236,7 +242,9 @@ async function resolveMarket(markets, m) {
     if (!b.paid) await confirmarPago(m, b);
   }
 
-  let verdict = await resolveWithAI(m);
+  // `veredictoPrevio` llega de la resolucion anticipada: el desenlace ya se
+  // determino y no hace falta volver a preguntar (ni gastar cuota de IA).
+  let verdict = veredictoPrevio || (await resolveWithAI(m));
   if (!verdict) verdict = demoVerdict(m);
   verdict.fuentes = sanitizeUrls(verdict.fuentes);
   m.verdict = verdict;
@@ -262,6 +270,37 @@ async function resolveMarket(markets, m) {
   await store.save(markets);
   console.log(`[oraculo] veredicto: ${verdict.outcome.toUpperCase()} · nostr: ${nostr.published ? "publicado" : "no"}`);
 }
+
+// --- Resolucion anticipada (criterio dinamico) -----------------------------
+// Una apuesta puede quedar decidida antes de su fecha limite: "¿Boca gana la
+// Sudamericana?" es NO en cuanto Boca queda eliminado. Aqui preguntamos al
+// agente si el desenlace ya es irreversible. Como la cuota de IA es limitada,
+// solo se revisa cada REVISION_MIN minutos por apuesta.
+const REVISION_MIN = Number(process.env.REVISION_ANTICIPADA_MIN || 20);
+
+const tocaRevisar = (m) =>
+  m.status === "open" &&
+  m.anticipada !== false &&
+  Date.now() / 1000 < m.resolves_at && // si ya vencio, va por la via normal
+  Date.now() / 1000 - (m.ultima_revision || 0) > REVISION_MIN * 60;
+
+app.post("/api/markets/:id/revisar", rateLimit(20, 10 * 60_000), async (req, res) => {
+  const markets = await store.load();
+  const m = store.find(markets, req.params.id);
+  if (!m) return res.status(404).json({ ok: false, error: "No existe." });
+  if (!tocaRevisar(m)) return res.json({ ok: true, revisada: false, resuelta: false });
+
+  m.ultima_revision = Math.floor(Date.now() / 1000);
+  await store.save(markets); // marcar antes: evita revisiones duplicadas en paralelo
+
+  const r = await comprobarDesenlaceAnticipado(m);
+  if (!r.resoluble) return res.json({ ok: true, revisada: true, resuelta: false });
+
+  console.log(`[oraculo] desenlace anticipado (${r.outcome.toUpperCase()}): "${m.question}"`);
+  r.fuentes = sanitizeUrls(r.fuentes);
+  await resolveMarket(markets, m, r);
+  res.json({ ok: true, revisada: true, resuelta: true, market: publicMarket(m) });
+});
 
 // Disparo de la resolucion. En serverless no hay temporizador: el front llama
 // aqui cuando una apuesta vence (o el presentador pulsa "resolver ya").
